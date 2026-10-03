@@ -1,364 +1,369 @@
 ```html
 <!DOCTYPE html>
-<html lang="en" class="h-full w-full select-none">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>3D Gravitational & Galaxy Simulator (Tablet & Touch Optimized)</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>3D Gravitational & Galaxy Simulator</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <!-- Google Fonts: Inter -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
-
-  <!-- External Libraries for 3D and Graphing -->
+  
+  <!-- Three.js (r128) & OrbitControls -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <!-- Chart.js for energy telemetry -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+  
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
   <style>
-    body {
+    * {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
       font-family: 'Inter', sans-serif;
-      touch-action: none; /* Disables default mobile pull-to-refresh & pinch zoom */
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
       background-color: #030712;
       color: #f3f4f6;
-      overflow: hidden;
     }
-
-    /* Glassmorphism Styling */
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
     .glass-panel {
       background: rgba(15, 23, 42, 0.75);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
-
-    .glass-card {
-      background: rgba(30, 41, 59, 0.6);
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    /* Touch-friendly inputs & custom sliders */
-    input[type=range] {
-      -webkit-appearance: none;
-      appearance: none;
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 9999px;
-      height: 8px;
-      outline: none;
-    }
-
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: #38bdf8;
-      cursor: pointer;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
-      border: 2px solid #ffffff;
-    }
-
-    /* Custom Scrollbars for panel */
+    /* Custom Scrollbar */
     ::-webkit-scrollbar {
-      width: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.2);
+      width: 4px;
     }
     ::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.2);
-      border-radius: 3px;
-    }
-
-    /* Pulse animation for status indicator */
-    @keyframes pulse-glow {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(1.1); }
-    }
-    .pulse-dot {
-      animation: pulse-glow 2s infinite ease-in-out;
+      border-radius: 4px;
     }
   </style>
 </head>
-<body class="h-full w-full relative overflow-hidden flex flex-col justify-between">
+<body class="relative w-full h-full">
 
-  <!-- WebGL Canvas Container -->
+  <!-- Main 3D WebGL Canvas -->
   <div id="canvas-container" class="absolute inset-0 w-full h-full z-0"></div>
 
-  <!-- HUD Top Bar (Stats & Mode) -->
-  <header class="relative z-10 p-3 md:p-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-    <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-3 pointer-events-auto shadow-lg">
-      <div class="w-3 h-3 rounded-full bg-cyan-400 pulse-dot shadow-[0_0_8px_#22d3ee]"></div>
-      <div>
-        <h1 class="text-sm md:text-base font-bold tracking-wide text-white flex items-center gap-2">
-          CHRONOS <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold">3D N-BODY</span>
-        </h1>
-        <p class="text-[10px] md:text-xs text-gray-400">Tablet & Touch Optimized</p>
-      </div>
+  <!-- Top Header / Quick Toolbar -->
+  <header class="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    <div class="glass-panel px-4 py-2 rounded-xl flex items-center gap-3 shadow-lg pointer-events-auto">
+      <div class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse"></div>
+      <h1 class="text-sm md:text-base font-bold bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400 bg-clip-text text-transparent">
+        Gravitational N-Body Lab
+      </h1>
     </div>
 
-    <!-- Live Performance Stats Badges -->
-    <div class="flex items-center gap-2 pointer-events-auto">
-      <div class="glass-panel px-3 py-1.5 rounded-xl text-center">
-        <span class="block text-[10px] uppercase tracking-wider text-gray-400">FPS</span>
-        <span id="stat-fps" class="text-xs md:text-sm font-bold text-emerald-400">60</span>
-      </div>
-      <div class="glass-panel px-3 py-1.5 rounded-xl text-center">
-        <span class="block text-[10px] uppercase tracking-wider text-gray-400">Particles</span>
-        <span id="stat-count" class="text-xs md:text-sm font-bold text-cyan-400">1000</span>
-      </div>
-      <div class="glass-panel px-3 py-1.5 rounded-xl text-center hidden sm:block">
-        <span class="block text-[10px] uppercase tracking-wider text-gray-400">Calc Time</span>
-        <span id="stat-calc" class="text-xs md:text-sm font-bold text-amber-400">0.0 ms</span>
-      </div>
-      
-      <!-- Drawer Toggle Button -->
-      <button id="toggle-panel-btn" class="glass-panel w-11 h-11 rounded-2xl flex items-center justify-center text-cyan-300 hover:text-white hover:bg-slate-800/80 active:scale-95 transition-all pointer-events-auto">
-        <i class="fa-solid fa-sliders text-lg"></i>
+    <!-- Presets & Main Controls -->
+    <div id="presetToolbar" class="glass-panel p-1.5 rounded-xl flex items-center gap-1.5 shadow-lg pointer-events-auto overflow-x-auto max-w-full">
+      <button id="btnGalaxy" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 active:scale-95 transition">
+        Galaxy Collision
+      </button>
+      <button id="btnSolar" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 active:scale-95 transition">
+        Solar System
+      </button>
+      <button id="btnCloud" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 active:scale-95 transition">
+        Star Cloud
+      </button>
+      <div class="h-4 w-px bg-gray-700 mx-1"></div>
+      <button id="pauseBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 active:scale-95 transition">
+        Pause
+      </button>
+      <button id="resetBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 active:scale-95 transition">
+        Reset
       </button>
     </div>
   </header>
 
-  <!-- Collapsible Floating Control Panel Drawer -->
-  <aside id="control-panel" class="fixed right-3 top-16 bottom-20 z-20 w-80 md:w-96 glass-panel rounded-3xl p-4 flex flex-col gap-4 shadow-2xl transition-transform duration-300 translate-x-[110%] md:translate-x-0 overflow-y-auto">
-    
-    <!-- Header inside drawer -->
-    <div class="flex items-center justify-between pb-2 border-b border-white/10">
-      <div class="flex items-center gap-2">
-        <i class="fa-solid fa-microchip text-cyan-400"></i>
-        <h2 class="font-bold text-sm md:text-base text-white">Simulation Controls</h2>
-      </div>
-      <button id="close-panel-btn" class="text-gray-400 hover:text-white p-2 rounded-xl text-lg md:hidden">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
+  <!-- Left Controls & Sliders Panel -->
+  <aside id="controlPanel" class="absolute top-16 left-3 z-20 w-72 max-h-[calc(100vh-5rem)] overflow-y-auto glass-panel p-4 rounded-2xl shadow-2xl pointer-events-auto flex flex-col gap-4 text-xs transition-all duration-300">
+    <div class="flex items-center justify-between border-b border-gray-800 pb-2">
+      <span class="font-bold text-gray-200 uppercase tracking-wider text-[10px]">Simulation Parameters</span>
+      <span class="text-[10px] text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800">Tablet Ready</span>
     </div>
 
-    <!-- Navigation Tabs -->
-    <div class="flex bg-slate-900/60 p-1 rounded-2xl border border-white/5">
-      <button id="tab-btn-presets" class="flex-1 py-2 text-xs font-semibold rounded-xl text-cyan-400 bg-slate-800/80 shadow transition-all">Presets</button>
-      <button id="tab-btn-physics" class="flex-1 py-2 text-xs font-semibold rounded-xl text-gray-400 hover:text-white transition-all">Physics</button>
-      <button id="tab-btn-chart" class="flex-1 py-2 text-xs font-semibold rounded-xl text-gray-400 hover:text-white transition-all">Energy</button>
+    <!-- Particle Count Slider -->
+    <div class="flex flex-col gap-1.5">
+      <div class="flex justify-between font-medium text-gray-300">
+        <label for="slider-particles">Particle Count</label>
+        <span id="slider-particles-val" class="text-cyan-400 font-mono">1500</span>
+      </div>
+      <input id="slider-particles" type="range" min="200" max="4000" step="100" value="1500" class="w-full accent-cyan-400 cursor-pointer">
     </div>
 
-    <!-- Tab 1: Presets -->
-    <div id="tab-content-presets" class="flex flex-col gap-2.5">
-      <label class="text-xs font-medium text-gray-300 flex items-center gap-1.5">
-        <i class="fa-solid fa-galaxy text-purple-400"></i> Cosmic Scenarios
-      </label>
-      
-      <div class="grid grid-cols-2 gap-2">
-        <button id="btn-preset-galaxy" class="glass-card hover:bg-cyan-500/20 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center gap-1.5 border-cyan-500/30 text-cyan-300">
-          <i class="fa-solid fa-atom text-xl"></i>
-          <span class="text-xs font-semibold">Galaxy Collision</span>
-        </button>
-        
-        <button id="btn-preset-solar" class="glass-card hover:bg-amber-500/20 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center gap-1.5 text-gray-300">
-          <i class="fa-solid fa-sun text-xl text-amber-400"></i>
-          <span class="text-xs font-semibold">Solar System</span>
-        </button>
-        
-        <button id="btn-preset-figure8" class="glass-card hover:bg-indigo-500/20 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center gap-1.5 text-gray-300">
-          <i class="fa-solid fa-infinity text-xl text-indigo-400"></i>
-          <span class="text-xs font-semibold">Figure-8 Orbits</span>
-        </button>
-        
-        <button id="btn-preset-cloud" class="glass-card hover:bg-emerald-500/20 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center gap-1.5 text-gray-300">
-          <i class="fa-solid fa-cloud text-xl text-emerald-400"></i>
-          <span class="text-xs font-semibold">Protostellar Cloud</span>
-        </button>
+    <!-- Gravitational Constant (G) -->
+    <div class="flex flex-col gap-1.5">
+      <div class="flex justify-between font-medium text-gray-300">
+        <label for="slider-gravity">Gravity (G)</label>
+        <span id="slider-gravity-val" class="text-cyan-400 font-mono">1.5</span>
       </div>
-
-      <!-- Device Performance Mode Selector -->
-      <div class="mt-2 glass-card p-3 rounded-2xl flex flex-col gap-2">
-        <label class="text-xs font-medium text-gray-300 flex items-center justify-between">
-          <span>Tablet Profile</span>
-          <span id="profile-label" class="text-[10px] text-cyan-400 font-bold uppercase">Tablet Mode (1000)</span>
-        </label>
-        <div class="grid grid-cols-3 gap-1 bg-slate-950/60 p-1 rounded-xl">
-          <button id="btn-profile-mobile" class="py-1.5 text-[11px] font-medium rounded-lg text-gray-400 hover:text-white">Mobile (500)</button>
-          <button id="btn-profile-tablet" class="py-1.5 text-[11px] font-medium rounded-lg text-cyan-400 bg-slate-800 shadow">Tablet (1000)</button>
-          <button id="btn-profile-desktop" class="py-1.5 text-[11px] font-medium rounded-lg text-gray-400 hover:text-white">High (2000)</button>
-        </div>
-      </div>
+      <input id="slider-gravity" type="range" min="0.1" max="10.0" step="0.1" value="1.5" class="w-full accent-cyan-400 cursor-pointer">
     </div>
 
-    <!-- Tab 2: Physics Controls -->
-    <div id="tab-content-physics" class="hidden flex-col gap-4">
-      <!-- Particle Count Slider -->
-      <div class="flex flex-col gap-1.5">
-        <div class="flex justify-between text-xs">
-          <span class="text-gray-300">Particle Count</span>
-          <span id="val-particles" class="font-bold text-cyan-400">1000</span>
-        </div>
-        <input id="slider-particles" type="range" min="200" max="2500" step="100" value="1000" class="w-full min-h-[44px] cursor-pointer" />
+    <!-- Softening Factor -->
+    <div class="flex flex-col gap-1.5">
+      <div class="flex justify-between font-medium text-gray-300">
+        <label for="slider-softening">Plummer Softening</label>
+        <span id="slider-softening-val" class="text-cyan-400 font-mono">120</span>
       </div>
-
-      <!-- Gravitational Constant G -->
-      <div class="flex flex-col gap-1.5">
-        <div class="flex justify-between text-xs">
-          <span class="text-gray-300">Gravity Strength (G)</span>
-          <span id="val-G" class="font-bold text-amber-400">1.5</span>
-        </div>
-        <input id="slider-G" type="range" min="0.1" max="5.0" step="0.1" value="1.5" class="w-full min-h-[44px] cursor-pointer" />
-      </div>
-
-      <!-- Time Step Delta T -->
-      <div class="flex flex-col gap-1.5">
-        <div class="flex justify-between text-xs">
-          <span class="text-gray-300">Time Step ($\Delta t$)</span>
-          <span id="val-dt" class="font-bold text-emerald-400">0.15</span>
-        </div>
-        <input id="slider-dt" type="range" min="0.01" max="0.5" step="0.01" value="0.15" class="w-full min-h-[44px] cursor-pointer" />
-      </div>
-
-      <!-- Softening Factor -->
-      <div class="flex flex-col gap-1.5">
-        <div class="flex justify-between text-xs">
-          <span class="text-gray-300">Distance Softening ($\epsilon$)</span>
-          <span id="val-softening" class="font-bold text-purple-400">15.0</span>
-        </div>
-        <input id="slider-softening" type="range" min="2.0" max="50.0" step="1.0" value="15.0" class="w-full min-h-[44px] cursor-pointer" />
-      </div>
-
-      <!-- Spacetime Grid Toggle -->
-      <div class="flex items-center justify-between glass-card p-3 rounded-2xl">
-        <span class="text-xs font-medium text-gray-300">Spacetime Grid Distortion</span>
-        <input id="toggle-grid" type="checkbox" checked class="w-5 h-5 accent-cyan-400 rounded cursor-pointer min-h-[44px]" />
-      </div>
+      <input id="slider-softening" type="range" min="10" max="500" step="10" value="120" class="w-full accent-cyan-400 cursor-pointer">
     </div>
 
-    <!-- Tab 3: Energy Analytics -->
-    <div id="tab-content-chart" class="hidden flex-col gap-3">
-      <div class="glass-card p-3 rounded-2xl h-48 relative">
-        <canvas id="energyChart"></canvas>
+    <!-- Time Step (dt) -->
+    <div class="flex flex-col gap-1.5">
+      <div class="flex justify-between font-medium text-gray-300">
+        <label for="slider-dt">Time Step (dt)</label>
+        <span id="slider-dt-val" class="text-cyan-400 font-mono">0.012</span>
       </div>
+      <input id="slider-dt" type="range" min="0.001" max="0.040" step="0.001" value="0.012" class="w-full accent-cyan-400 cursor-pointer">
+    </div>
 
-      <div class="grid grid-cols-2 gap-2 text-xs">
-        <div class="glass-card p-2.5 rounded-xl">
-          <span class="text-[10px] text-gray-400 block">Kinetic Energy ($E_k$)</span>
-          <span id="stat-ek" class="font-bold text-cyan-400">0</span>
-        </div>
-        <div class="glass-card p-2.5 rounded-xl">
-          <span class="text-[10px] text-gray-400 block">Potential Energy ($E_p$)</span>
-          <span id="stat-ep" class="font-bold text-rose-400">0</span>
-        </div>
-        <div class="glass-card p-2.5 rounded-xl">
-          <span class="text-[10px] text-gray-400 block">Total Energy ($E_t$)</span>
-          <span id="stat-et" class="font-bold text-amber-400">0</span>
-        </div>
-        <div class="glass-card p-2.5 rounded-xl">
-          <span class="text-[10px] text-gray-400 block">Energy Drift</span>
-          <span id="stat-drift" class="font-bold text-emerald-400">0.00%</span>
-        </div>
-      </div>
+    <div class="p-2.5 rounded-xl bg-gray-900/60 border border-gray-800/80 text-[11px] text-gray-400 leading-relaxed">
+      💡 <strong class="text-gray-200">Interactive Attractor:</strong> Press or drag on open 3D space to spawn a high-mass gravitational singularity!
     </div>
   </aside>
 
-  <!-- Bottom Quick Controls Bar -->
-  <footer class="relative z-10 p-3 md:p-4 flex items-center justify-center gap-3 pointer-events-none">
-    <div class="glass-panel px-4 py-2 rounded-full flex items-center gap-3 shadow-2xl pointer-events-auto">
-      <!-- Play/Pause Button -->
-      <button id="btn-play-pause" class="w-12 h-12 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold flex items-center justify-center shadow-lg shadow-cyan-500/30 active:scale-90 transition-all text-lg">
-        <i class="fa-solid fa-pause" id="play-icon"></i>
-      </button>
-
-      <!-- Reset Simulation Button -->
-      <button id="btn-reset" class="w-11 h-11 rounded-full bg-slate-800 hover:bg-slate-700 text-cyan-300 flex items-center justify-center active:scale-90 transition-all text-base border border-white/10">
-        <i class="fa-solid fa-rotate-right"></i>
-      </button>
-
-      <div class="w-px h-6 bg-white/15"></div>
-
-      <!-- Touch Gravity Interaction Mode Toggle -->
-      <button id="btn-touch-attract" class="px-3.5 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-gray-300 flex items-center gap-2 active:scale-95 transition-all text-xs font-semibold border border-white/10">
-        <i class="fa-solid fa-hand-pointer text-cyan-400"></i>
-        <span id="attract-label" class="hidden sm:inline">Gravity Touch: OFF</span>
-      </button>
-
-      <!-- Camera Reset Button -->
-      <button id="btn-camera-reset" class="w-11 h-11 rounded-full bg-slate-800 hover:bg-slate-700 text-gray-300 flex items-center justify-center active:scale-90 transition-all text-base border border-white/10">
-        <i class="fa-solid fa-video"></i>
-      </button>
+  <!-- Right Telemetry & Telemetry Chart Panel -->
+  <aside id="statsPanel" class="absolute bottom-3 right-3 z-20 w-72 glass-panel p-3.5 rounded-2xl shadow-2xl pointer-events-auto flex flex-col gap-3 text-xs">
+    <div class="flex items-center justify-between border-b border-gray-800 pb-1.5">
+      <span class="font-bold text-gray-200 uppercase tracking-wider text-[10px]">Telemetry & Energy</span>
+      <span class="text-[10px] text-emerald-400 font-mono"><span id="stat-fps">60</span> FPS</span>
     </div>
-  </footer>
 
-  <!-- WebGL Context Lost Warning Modal -->
-  <div id="context-lost-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-    <div class="glass-panel p-6 rounded-3xl max-w-sm flex flex-col items-center gap-4 border-rose-500/40">
-      <div class="w-12 h-12 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400 text-2xl">
-        <i class="fa-solid fa-triangle-exclamation"></i>
+    <!-- Realtime Stats Grid -->
+    <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+      <div class="p-2 rounded-lg bg-gray-900/50 border border-gray-800">
+        <div class="text-[9px] text-gray-400 uppercase">Calc Time</div>
+        <div id="stat-calc-time" class="text-gray-200 font-bold">0.0 ms</div>
       </div>
-      <h3 class="text-lg font-bold text-white">GPU Context Lost</h3>
-      <p class="text-xs text-gray-300">Your tablet GPU freed memory. Automatically restoring simulation rendering...</p>
-      <button id="btn-reload-context" class="px-5 py-2.5 bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold rounded-xl shadow-lg active:scale-95 transition-all">
-        Restore Context
-      </button>
+      <div class="p-2 rounded-lg bg-gray-900/50 border border-gray-800">
+        <div class="text-[9px] text-gray-400 uppercase">Energy Drift</div>
+        <div id="stat-drift" class="text-amber-400 font-bold">0.00%</div>
+      </div>
+      <div class="p-2 rounded-lg bg-gray-900/50 border border-gray-800">
+        <div class="text-[9px] text-emerald-400 uppercase">Kinetic ($E_k$)</div>
+        <div id="stat-ek" class="text-gray-200 font-bold truncate">0</div>
+      </div>
+      <div class="p-2 rounded-lg bg-gray-900/50 border border-gray-800">
+        <div class="text-[9px] text-purple-400 uppercase">Potential ($E_p$)</div>
+        <div id="stat-ep" class="text-gray-200 font-bold truncate">0</div>
+      </div>
     </div>
-  </div>
+
+    <!-- Energy Chart Canvas -->
+    <div class="w-full h-24 relative mt-1">
+      <canvas id="energyChart"></canvas>
+    </div>
+  </aside>
 
   <script>
-  /* Barnes-Hut Octree Node Pool for 0-Garbage-Collection Tablet Physics */
-  class OctreeNode {
-    constructor() {
-      this.cx = 0; this.cy = 0; this.cz = 0;
-      this.size = 0;
-      this.mass = 0;
-      this.comX = 0; this.comY = 0; this.comZ = 0;
-      this.children = new Array(8).fill(null);
-      this.particleIdx = -1;
-      this.isLeaf = true;
-    }
-
-    reset(cx, cy, cz, size) {
-      this.cx = cx; this.cy = cy; this.cz = cz;
-      this.size = size;
-      this.mass = 0;
-      this.comX = 0; this.comY = 0; this.comZ = 0;
-      this.particleIdx = -1;
-      this.isLeaf = true;
-      for (let i = 0; i < 8; i++) this.children[i] = null;
-    }
-  }
-
-  class OctreePool {
-    constructor(maxNodes = 10000) {
-      this.pool = Array.from({ length: maxNodes }, () => new OctreeNode());
-      this.index = 0;
-    }
-
-    getNode(cx, cy, cz, size) {
-      if (this.index >= this.pool.length) {
-        this.pool.push(new OctreeNode());
+  class BHTree {
+    constructor(capacity = 25000) {
+      this.pool = [];
+      this.poolIdx = 0;
+      this.capacity = capacity;
+      for (let i = 0; i < capacity; i++) {
+        this.pool.push({
+          cx: 0, cy: 0, cz: 0,
+          mass: 0,
+          bodyCount: 0,
+          bodyIdx: -1,
+          minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0,
+          size: 0,
+          children: [null, null, null, null, null, null, null, null]
+        });
       }
-      const node = this.pool[this.index++];
-      node.reset(cx, cy, cz, size);
+      this.root = null;
+    }
+
+    resetPool() {
+      this.poolIdx = 0;
+    }
+
+    getNode() {
+      if (this.poolIdx >= this.capacity) {
+        for (let i = 0; i < 2000; i++) {
+          this.pool.push({
+            cx: 0, cy: 0, cz: 0, mass: 0, bodyCount: 0, bodyIdx: -1,
+            minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0, size: 0,
+            children: [null, null, null, null, null, null, null, null]
+          });
+        }
+        this.capacity += 2000;
+      }
+      const node = this.pool[this.poolIdx++];
+      node.cx = 0; node.cy = 0; node.cz = 0;
+      node.mass = 0; node.bodyCount = 0; node.bodyIdx = -1;
+      for (let c = 0; c < 8; c++) node.children[c] = null;
       return node;
     }
 
-    clear() {
-      this.index = 0;
+    build(posX, posY, posZ, mass, count) {
+      this.resetPool();
+      if (count === 0) {
+        this.root = null;
+        return;
+      }
+
+      let minX = posX[0], maxX = posX[0];
+      let minY = posY[0], maxY = posY[0];
+      let minZ = posZ[0], maxZ = posZ[0];
+
+      for (let i = 1; i < count; i++) {
+        if (posX[i] < minX) minX = posX[i];
+        if (posX[i] > maxX) maxX = posX[i];
+        if (posY[i] < minY) minY = posY[i];
+        if (posY[i] > maxY) maxY = posY[i];
+        if (posZ[i] < minZ) minZ = posZ[i];
+        if (posZ[i] > maxZ) maxZ = posZ[i];
+      }
+
+      let dx = maxX - minX;
+      let dy = maxY - minY;
+      let dz = maxZ - minZ;
+      let maxDim = Math.max(dx, Math.max(dy, dz)) + 20.0;
+
+      let midX = (minX + maxX) * 0.5;
+      let midY = (minY + maxY) * 0.5;
+      let midZ = (minZ + maxZ) * 0.5;
+
+      this.root = this.getNode();
+      this.root.minX = midX - maxDim * 0.5;
+      this.root.maxX = midX + maxDim * 0.5;
+      this.root.minY = midY - maxDim * 0.5;
+      this.root.maxY = midY + maxDim * 0.5;
+      this.root.minZ = midZ - maxDim * 0.5;
+      this.root.maxZ = midZ + maxDim * 0.5;
+      this.root.size = maxDim;
+
+      for (let i = 0; i < count; i++) {
+        this.insert(this.root, i, posX[i], posY[i], posZ[i], mass[i]);
+      }
+    }
+
+    insert(node, idx, px, py, pz, m) {
+      if (node.bodyCount === 0) {
+        node.bodyCount = 1;
+        node.bodyIdx = idx;
+        node.cx = px; node.cy = py; node.cz = pz;
+        node.mass = m;
+        return;
+      }
+
+      if (node.bodyCount === 1) {
+        const oldIdx = node.bodyIdx;
+        const oldPx = node.cx; const oldPy = node.cy; const oldPz = node.cz;
+        const oldM = node.mass;
+
+        node.bodyIdx = -1;
+        node.bodyCount = 2;
+
+        this.insertChild(node, oldIdx, oldPx, oldPy, oldPz, oldM);
+        this.insertChild(node, idx, px, py, pz, m);
+
+        node.mass = oldM + m;
+        node.cx = (oldPx * oldM + px * m) / node.mass;
+        node.cy = (oldPy * oldM + py * m) / node.mass;
+        node.cz = (oldPz * oldM + pz * m) / node.mass;
+        return;
+      }
+
+      node.bodyCount++;
+      const newMass = node.mass + m;
+      node.cx = (node.cx * node.mass + px * m) / newMass;
+      node.cy = (node.cy * node.mass + py * m) / newMass;
+      node.cz = (node.cz * node.mass + pz * m) / newMass;
+      node.mass = newMass;
+
+      this.insertChild(node, idx, px, py, pz, m);
+    }
+
+    insertChild(node, idx, px, py, pz, m) {
+      const midX = (node.minX + node.maxX) * 0.5;
+      const midY = (node.minY + node.maxY) * 0.5;
+      const midZ = (node.minZ + node.maxZ) * 0.5;
+
+      let octant = 0;
+      if (px >= midX) octant |= 1;
+      if (py >= midY) octant |= 2;
+      if (pz >= midZ) octant |= 4;
+
+      if (!node.children[octant]) {
+        const child = this.getNode();
+        child.minX = (octant & 1) ? midX : node.minX;
+        child.maxX = (octant & 1) ? node.maxX : midX;
+        child.minY = (octant & 2) ? midY : node.minY;
+        child.maxY = (octant & 2) ? node.maxY : midY;
+        child.minZ = (octant & 4) ? midZ : node.minZ;
+        child.maxZ = (octant & 4) ? node.maxZ : midZ;
+        child.size = node.size * 0.5;
+        node.children[octant] = child;
+      }
+
+      this.insert(node.children[octant], idx, px, py, pz, m);
+    }
+
+    calculateForce(node, i, px, py, pz, accX, accY, accZ, theta, G, softening) {
+      if (!node || node.mass === 0) return;
+
+      const dx = node.cx - px;
+      const dy = node.cy - py;
+      const dz = node.cz - pz;
+      const distSq = dx * dx + dy * dy + dz * dz + softening;
+      const dist = Math.sqrt(distSq);
+
+      if (node.bodyCount === 1) {
+        if (node.bodyIdx === i) return;
+        const f = (G * node.mass) / (distSq * dist);
+        accX[i] += dx * f;
+        accY[i] += dy * f;
+        accZ[i] += dz * f;
+        return;
+      }
+
+      if ((node.size / dist) < theta) {
+        const f = (G * node.mass) / (distSq * dist);
+        accX[i] += dx * f;
+        accY[i] += dy * f;
+        accZ[i] += dz * f;
+      } else {
+        for (let c = 0; c < 8; c++) {
+          if (node.children[c]) {
+            this.calculateForce(node.children[c], i, px, py, pz, accX, accY, accZ, theta, G, softening);
+          }
+        }
+      }
     }
   }
 
-  /* Main Chronos 3D Simulation Controller */
-  class ChronosSimulation {
+  class GravitationalSimulator {
     constructor() {
-      this.particleCount = 1000;
+      this.maxParticles = 4000;
+      this.particleCount = 1500;
       this.G = 1.5;
-      this.dt = 0.15;
-      this.softening = 15.0; // Distance softening to prevent NaN/Infinity
-      this.theta = 0.7;      // Barnes-Hut accuracy threshold
+      this.softening = 120.0;
+      this.dt = 0.012;
+      this.theta = 0.6;
       this.isPaused = false;
-      this.touchAttractMode = false;
-      this.showGrid = true;
+      this.currentPreset = 'galaxy';
 
-      // Particle Buffers (Float32 TypedArrays for hardware speed)
-      this.maxParticles = 3000;
+      // Flat Typed Arrays for cache locality
       this.posX = new Float32Array(this.maxParticles);
       this.posY = new Float32Array(this.maxParticles);
       this.posZ = new Float32Array(this.maxParticles);
@@ -370,86 +375,67 @@
       this.accZ = new Float32Array(this.maxParticles);
       this.mass = new Float32Array(this.maxParticles);
       this.vMag = new Float32Array(this.maxParticles);
+      this.flatPosBuffer = new Float32Array(this.maxParticles * 3);
 
-      // Barnes-Hut Pool
-      this.nodePool = new OctreePool(12000);
-
-      // Mouse/Touch Pointer interaction plane
-      this.mousePos = new THREE.Vector3(0, 0, 0);
-      this.mouseActive = false;
-      this.raycaster = new THREE.Raycaster();
-      this.pointer = new THREE.Vector2();
-      this.interactionPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-
-      // Energy Analytics Trackers
+      this.tree = new BHTree(30000);
       this.initialEnergy = 0;
-      this.energyHistoryLength = 30;
+      this.touchActive = false;
 
-      // Initialize
-      this.initWebGL();
+      this.initThree();
       this.initSpacetimeGrid();
       this.initParticles();
+      this.initAttractorVisualizer();
+      this.initTouchAndMouse();
       this.initChart();
-      this.initEventListeners();
-      this.loadPreset('galaxy');
+      this.initUI();
 
+      this.loadPreset('galaxy');
       this.animate();
     }
 
-    initWebGL() {
+    initThree() {
       const container = document.getElementById('canvas-container');
-
-      // 3D Scene
       this.scene = new THREE.Scene();
-      this.scene.fog = new THREE.FogExp2(0x030712, 0.0008);
+      this.scene.fog = new THREE.FogExp2(0x030712, 0.0004);
 
-      // Camera
       this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
-      this.camera.position.set(0, 350, 650);
+      this.camera.position.set(0, 750, 1200);
 
-      // WebGL Renderer setup with Mobile Context-Loss Safety
-      this.renderer = new THREE.WebGLRenderer({
-        antialias: window.innerWidth > 768, // Disable AA on small mobile screens for performance
-        powerPreference: 'high-performance',
-        alpha: false
-      });
-
-      // KEY MOBILE OPTIMIZATION: Cap Pixel Ratio to 1.0 or max 1.5 to prevent memory crashes
-      const safeDPR = Math.min(window.devicePixelRatio || 1, 1.5);
-      this.renderer.setPixelRatio(safeDPR);
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
       this.renderer.setSize(window.innerWidth, window.innerHeight);
-      this.renderer.setClearColor(0x030712, 1);
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       container.appendChild(this.renderer.domElement);
 
-      // Orbit Controls
       this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
       this.controls.enableDamping = true;
       this.controls.dampingFactor = 0.05;
-      this.controls.rotateSpeed = 0.8;
-      this.controls.zoomSpeed = 1.0;
-      this.controls.maxDistance = 3000;
+      this.controls.maxDistance = 5000;
       this.controls.minDistance = 50;
 
-      // Ambient & Directional Lighting
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
       this.scene.add(ambientLight);
 
       const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
       dirLight.position.set(200, 500, 300);
       this.scene.add(dirLight);
+
+      window.addEventListener('resize', () => {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      });
     }
 
     initSpacetimeGrid() {
-      const gridRadius = 1200;
-      const gridSegments = 40;
+      const gridRadius = 1400;
+      const gridSegments = 44;
       this.gridGeo = new THREE.PlaneGeometry(gridRadius, gridRadius, gridSegments, gridSegments);
       this.gridGeo.rotateX(-Math.PI / 2);
 
-      // Save initial un-warped positions
       this.gridOriginalY = new Float32Array(this.gridGeo.attributes.position.count);
       const posAttr = this.gridGeo.attributes.position;
       for (let i = 0; i < posAttr.count; i++) {
-                this.gridOriginalY[i] = posAttr.getY(i);
+        this.gridOriginalY[i] = posAttr.getY(i);
       }
 
       this.gridMat = new THREE.MeshBasicMaterial({
@@ -479,8 +465,7 @@
           void main() {
             vVelocity = vMag;
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-            // Touch/tablet dynamic particle size scaling
-            gl_PointSize = clamp(180.0 / -mvPosition.z, 2.0, 8.0);
+            gl_PointSize = clamp(220.0 / -mvPosition.z, 2.5, 9.0);
             gl_Position = projectionMatrix * mvPosition;
           }
         `,
@@ -490,10 +475,10 @@
             float d = length(gl_PointCoord - vec2(0.5));
             if (d > 0.5) discard;
             float alpha = smoothstep(0.5, 0.0, d);
-            float normV = clamp(vVelocity / 15.0, 0.0, 1.0);
+            float normV = clamp(vVelocity / 18.0, 0.0, 1.0);
 
-            vec3 colorLow = vec3(0.0, 0.6, 1.0);
-            vec3 colorMid = vec3(0.6, 0.2, 0.9);
+            vec3 colorLow = vec3(0.1, 0.6, 1.0);
+            vec3 colorMid = vec3(0.7, 0.2, 0.9);
             vec3 colorHigh = vec3(1.0, 0.8, 0.2);
 
             vec3 color = mix(colorLow, colorMid, smoothstep(0.0, 0.5, normV));
@@ -511,6 +496,15 @@
       this.scene.add(this.particleSystem);
     }
 
+    initAttractorVisualizer() {
+      const ringGeo = new THREE.RingGeometry(15, 20, 32);
+      ringGeo.rotateX(-Math.PI / 2);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+      this.attractorMesh = new THREE.Mesh(ringGeo, ringMat);
+      this.attractorMesh.visible = false;
+      this.scene.add(this.attractorMesh);
+    }
+
     initTouchAndMouse() {
       this.raycaster = new THREE.Raycaster();
       this.mouseVec = new THREE.Vector2();
@@ -526,7 +520,7 @@
 
       const handlePointerStart = (e) => {
         if (e.target.closest('#controlPanel') || e.target.closest('#statsPanel') || e.target.closest('#presetToolbar')) return;
-        
+
         const pos = getScreenPos(e);
         this.mouseVec.x = (pos.x / window.innerWidth) * 2 - 1;
         this.mouseVec.y = -(pos.y / window.innerHeight) * 2 + 1;
@@ -809,7 +803,8 @@
 
       const pauseBtn = document.getElementById('pauseBtn');
       if (pauseBtn) {
-        pauseBtn.addEventListener('click', () => {
+        pauseBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
           this.isPaused = !this.isPaused;
           pauseBtn.innerText = this.isPaused ? 'Resume' : 'Pause';
         });
@@ -817,12 +812,21 @@
 
       const resetBtn = document.getElementById('resetBtn');
       if (resetBtn) {
-        resetBtn.addEventListener('click', () => this.loadPreset('galaxy'));
+        resetBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.loadPreset('galaxy');
+        });
       }
 
       const bindBtn = (id, preset) => {
         const btn = document.getElementById(id);
-        if (btn) btn.addEventListener('click', () => this.loadPreset(preset));
+        if (btn) {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.loadPreset(preset);
+          });
+          btn.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+        }
       };
 
       bindBtn('btnGalaxy', 'galaxy');
@@ -837,6 +841,7 @@
             const valEl = document.getElementById(`${id}-val`);
             if (valEl) valEl.innerText = e.target.value;
           });
+          el.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
         }
       };
 
