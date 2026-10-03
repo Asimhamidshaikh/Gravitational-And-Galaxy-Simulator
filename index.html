@@ -400,122 +400,123 @@
         this.gridMesh.position.y = -220;
         this.scene.add(this.gridMesh);
       }
+  initTouchControls() {
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-      initTouchControls() {
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const updateTouchPoint = (e) => {
+      // FIX 1: Safe touch extraction (prevents crash on touch release)
+      const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+      const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
 
-        const updateTouchPoint = (e) => {
-          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-          const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
-          mouse.x = (clientX / window.innerWidth) * 2 - 1;
-          mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, this.camera);
+      if (!this.touchPos) this.touchPos = new THREE.Vector3();
+      raycaster.ray.intersectPlane(plane, this.touchPos);
+    };
 
-          raycaster.setFromCamera(mouse, this.camera);
-          raycaster.ray.intersectPlane(plane, this.touchPos);
-        };
+    const onDown = (e) => {
+      if (e.target.closest('.glass-panel') || e.target.closest('header')) return;
+      this.touchActive = true;
+      updateTouchPoint(e);
+    };
 
-        const onDown = (e) => {
-          if (e.target.closest('.glass-panel') || e.target.closest('header')) return;
-          this.touchActive = true;
-          updateTouchPoint(e);
-        };
+    const onMove = (e) => {
+      if (this.touchActive) updateTouchPoint(e);
+    };
 
-        const onMove = (e) => {
-          if (this.touchActive) updateTouchPoint(e);
-        };
+    const onUp = () => {
+      this.touchActive = false;
+    };
 
-        const onUp = () => {
-          this.touchActive = false;
-        };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchstart', onDown, { passive: true });
+    window.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchend', onUp);
+  }
 
-        window.addEventListener('mousedown', onDown);
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
-        window.addEventListener('touchstart', onDown, { passive: true });
-        window.addEventListener('touchmove', onMove, { passive: true });
-        window.addEventListener('touchend', onUp);
+  loadPreset(type) {
+    for (let i = 0; i < this.maxN; i++) {
+      this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
+      this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
+      this.mass[i] = 1.0;
+    }
+
+    if (type === 'galaxy') {
+      // Two colliding spiral galaxies
+      const half = Math.floor(this.N / 2);
+      this.spawnGalaxy(0, -350, 0, 0, 0, 11, 0, half, 420);
+      this.spawnGalaxy(half, 350, 0, 0, 0, -11, 0, this.N - half, 420);
+    } else if (type === 'solar') {
+      // Central massive Star with circumstellar disk
+      this.mass[0] = 5000;
+      this.posX[0] = 0; this.posY[0] = 0; this.posZ[0] = 0;
+      this.velX[0] = 0; this.velY[0] = 0; this.velZ[0] = 0;
+
+      for (let i = 1; i < this.N; i++) {
+        const r = 120 + Math.random() * 750;
+        const a = Math.random() * Math.PI * 2;
+        this.posX[i] = r * Math.cos(a);
+        this.posZ[i] = r * Math.sin(a);
+        this.posY[i] = (Math.random() - 0.5) * 8;
+
+        const v = Math.sqrt((this.G * 5000) / r);
+        this.velX[i] = -v * Math.sin(a);
+        this.velZ[i] = v * Math.cos(a);
+        this.mass[i] = 0.5 + Math.random() * 2.0;
       }
+    } else if (type === 'cloud') {
+      // Spherical turbulent cluster
+      for (let i = 0; i < this.N; i++) {
+        const r = Math.cbrt(Math.random()) * 550;
+        const a = Math.random() * Math.PI * 2;
+        const p = Math.acos(2 * Math.random() - 1);
 
-      loadPreset(type) {
-        for (let i = 0; i < this.maxN; i++) {
-          this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
-          this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
-          this.mass[i] = 1.0;
-        }
+        this.posX[i] = r * Math.sin(p) * Math.cos(a);
+        this.posY[i] = r * Math.sin(p) * Math.sin(a);
+        this.posZ[i] = r * Math.cos(p);
 
-        if (type === 'galaxy') {
-          // Two colliding spiral galaxies
-          const half = Math.floor(this.N / 2);
-          this.spawnGalaxy(0, -350, 0, 0, 0, 11, 0, half, 420);
-          this.spawnGalaxy(half, 350, 0, 0, 0, -11, 0, this.N - half, 420);
-        } else if (type === 'solar') {
-          // Central massive Star with circumstellar disk
-          this.mass[0] = 5000;
-          this.posX[0] = 0; this.posY[0] = 0; this.posZ[0] = 0;
-          this.velX[0] = 0; this.velY[0] = 0; this.velZ[0] = 0;
-
-          for (let i = 1; i < this.N; i++) {
-            const r = 120 + Math.random() * 750;
-            const a = Math.random() * Math.PI * 2;
-            this.posX[i] = r * Math.cos(a);
-            this.posZ[i] = r * Math.sin(a);
-            this.posY[i] = (Math.random() - 0.5) * 8;
-
-            const v = Math.sqrt((this.G * 5000) / r);
-            this.velX[i] = -v * Math.sin(a);
-            this.velZ[i] = v * Math.cos(a);
-            this.mass[i] = 0.5 + Math.random() * 2.0;
-          }
-        } else if (type === 'cloud') {
-          // Spherical turbulent cluster
-          for (let i = 0; i < this.N; i++) {
-            const r = Math.cbrt(Math.random()) * 550;
-            const a = Math.random() * Math.PI * 2;
-            const p = Math.acos(2 * Math.random() - 1);
-
-            this.posX[i] = r * Math.sin(p) * Math.cos(a);
-            this.posY[i] = r * Math.sin(p) * Math.sin(a);
-            this.posZ[i] = r * Math.cos(p);
-
-            this.velX[i] = -this.posZ[i] * 0.05 + (Math.random() - 0.5) * 0.5;
-            this.velY[i] = (Math.random() - 0.5) * 0.5;
-            this.velZ[i] = this.posX[i] * 0.05 + (Math.random() - 0.5) * 0.5;
-            this.mass[i] = 1.0 + Math.random() * 3.0;
-          }
-        }
-        this.computeEnergies(true);
+        this.velX[i] = -this.posZ[i] * 0.05 + (Math.random() - 0.5) * 0.5;
+        this.velY[i] = (Math.random() - 0.5) * 0.5;
+        this.velZ[i] = this.posX[i] * 0.05 + (Math.random() - 0.5) * 0.5;
+        this.mass[i] = 1.0 + Math.random() * 3.0;
       }
+    }
 
-      spawnGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
-        // Supermassive Core
-        this.mass[offset] = 3500;
-        this.posX[offset] = cx; this.posY[offset] = cy; this.posZ[offset] = cz;
-        this.velX[offset] = vx; this.velY[offset] = vy; this.velZ[offset] = vz;
+    // FIX 2: Removed non-existent this.computeEnergies() call that caused crashes
+  }
 
-        for (let i = 1; i < count; i++) {
-          const idx = offset + i;
-          const r = Math.sqrt(Math.random()) * radius + 25;
-          const a = Math.random() * Math.PI * 2;
+  spawnGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
+    // Supermassive Core
+    this.mass[offset] = 3500;
+    this.posX[offset] = cx; this.posY[offset] = cy; this.posZ[offset] = cz;
+    this.velX[offset] = vx; this.velY[offset] = vy; this.velZ[offset] = vz;
 
-          this.posX[idx] = cx + r * Math.cos(a);
-          this.posY[idx] = cy + (Math.random() - 0.5) * 14;
-          this.posZ[idx] = cz + r * Math.sin(a);
+    for (let i = 1; i < count; i++) {
+      const idx = offset + i;
+      const r = Math.sqrt(Math.random()) * radius + 25;
+      const a = Math.random() * Math.PI * 2;
 
-          const v = Math.sqrt((this.G * 3500) / r);
-                  this.velX[idx] = -v * Math.sin(a) + vx;
-        this.velY[idx] = (Math.random() - 0.5) * 2 + vy;
-        this.velZ[idx] = v * Math.cos(a) + vz;
+      this.posX[idx] = cx + r * Math.cos(a);
+      this.posY[idx] = cy + (Math.random() - 0.5) * 14;
+      this.posZ[idx] = cz + r * Math.sin(a);
 
-        this.mass[idx] = 1.0;
+      const v = Math.sqrt((this.G * 3500) / r);
+      this.velX[idx] = -v * Math.sin(a) + vx;
+      this.velY[idx] = (Math.random() - 0.5) * 2 + vy;
+      this.velZ[idx] = v * Math.cos(a) + vz;
 
-        const color = new THREE.Color().setHSL(0.55 + (r / 400) * 0.25, 0.85, 0.6);
-        this.colors[idx * 3] = color.r;
-        this.colors[idx * 3 + 1] = color.g;
-        this.colors[idx * 3 + 2] = color.b;
-      }
+      this.mass[idx] = 1.0;
+
+      const color = new THREE.Color().setHSL(0.55 + (r / 400) * 0.25, 0.85, 0.6);
+      this.colors[idx * 3] = color.r;
+      this.colors[idx * 3 + 1] = color.g;
+      this.colors[idx * 3 + 2] = color.b;
     }
 
     this.geometry.attributes.position.needsUpdate = true;
@@ -569,26 +570,43 @@
         totalPotential -= (G * mi * this.mass[j]) / dist;
       }
 
-      // Symplectic Integration for energy conservation
-this.velX[i] += this.accX[i] * dt;
-this.velY[i] += this.accY[i] * dt;
-this.velZ[i] += this.accZ[i] * dt;
+      // FIX 3: Touch/Mouse Attractor physics application
+      if (this.touchActive && this.touchPos) {
+        const dx = this.touchPos.x - xi;
+        const dy = this.touchPos.y - yi;
+        const dz = this.touchPos.z - zi;
+        const distSq = dx * dx + dy * dy + dz * dz + eps2;
+        const dist = Math.sqrt(distSq);
+        const invDist3 = 1.0 / (distSq * dist);
+        const touchMass = 10000;
+        const f = G * touchMass * invDist3;
 
-this.posX[i] += this.velX[i] * dt;
-this.posY[i] += this.velY[i] * dt;
-this.posZ[i] += this.velZ[i] * dt;
-      
-      
+        this.accX[i] += f * dx;
+        this.accY[i] += f * dy;
+        this.accZ[i] += f * dz;
+      }
+    }
+
+    // FIX 4: Moved posAttr buffer reference outside the loop for high FPS performance
+    const posAttr = this.geometry.attributes.position.array;
+
+    // Symplectic Integration
+    for (let i = 0; i < N; i++) {
+      this.velX[i] += this.accX[i] * dt;
+      this.velY[i] += this.accY[i] * dt;
+      this.velZ[i] += this.accZ[i] * dt;
+
+      this.posX[i] += this.velX[i] * dt;
+      this.posY[i] += this.velY[i] * dt;
+      this.posZ[i] += this.velZ[i] * dt;
 
       const speedSq = this.velX[i] ** 2 + this.velY[i] ** 2 + this.velZ[i] ** 2;
-      totalKinetic += 0.5 * mi * speedSq;
+      totalKinetic += 0.5 * this.mass[i] * speedSq;
 
-              const posAttr = this.geometry.attributes.position.array;
-        posAttr[i * 3]     = this.posX[i];
-        posAttr[i * 3 + 1] = this.posY[i];
-        posAttr[i * 3 + 2] = this.posZ[i];
+      posAttr[i * 3] = this.posX[i];
+      posAttr[i * 3 + 1] = this.posY[i];
+      posAttr[i * 3 + 2] = this.posZ[i];
     }
-    
 
     this.geometry.attributes.position.needsUpdate = true;
 
@@ -640,3 +658,5 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
+                    
