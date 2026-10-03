@@ -2,661 +2,428 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>3D Gravitational & Galaxy N-Body Simulator</title>
-  
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#f0f9ff',
-              400: '#38bdf8',
-              500: '#0ea5e9',
-              600: '#0284c7',
-              900: '#0c4a6e',
-            }
-          },
-          fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          }
-        }
-      }
-    }
-  </script>
 
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-
+  <!-- Three.js and OrbitControls -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
   <style>
-    * {
-      touch-action: manipulation;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    body, html {
+    body {
       margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
       overflow: hidden;
       background-color: #030712;
       color: #f3f4f6;
-      font-family: 'Inter', sans-serif;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      user-select: none;
     }
-    #canvas-container {
-      position: absolute;
-      top: 0;
-      left: 0;
+    canvas {
+      display: block;
       width: 100vw;
       height: 100vh;
-      z-index: 1;
     }
     .glass-panel {
-      background: rgba(15, 23, 42, 0.75);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(17, 24, 39, 0.75);
+      backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-    }
-    .glass-btn {
-      background: rgba(30, 41, 59, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      transition: all 0.2s ease;
-    }
-    .glass-btn:hover {
-      background: rgba(51, 65, 85, 0.9);
-      border-color: rgba(56, 189, 248, 0.5);
-    }
-    .glass-btn:active {
-      transform: scale(0.96);
-    }
-    /* Custom Range Inputs */
-    input[type=range] {
-      -webkit-appearance: none;
-      background: rgba(30, 41, 59, 0.8);
-      height: 6px;
-      border-radius: 3px;
-      outline: none;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #38bdf8;
-      cursor: pointer;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
-      transition: transform 0.1s ease;
-    }
-    input[type=range]::-webkit-slider-thumb:hover {
-      transform: scale(1.2);
-    }
-    /* Custom Scrollbar for Controls */
-    .custom-scroll::-webkit-scrollbar {
-      width: 4px;
-    }
-    .custom-scroll::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.5);
-    }
-    .custom-scroll::-webkit-scrollbar-thumb {
-      background: rgba(56, 189, 248, 0.3);
-      border-radius: 2px;
     }
   </style>
 </head>
-<body class="antialiased">
+<body class="w-screen h-screen overflow-hidden">
 
-  <!-- 3D WebGL Canvas Viewport -->
-  <div id="canvas-container"></div>
-
-  <!-- Header Bar -->
-  <header class="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-    <div class="glass-panel pointer-events-auto rounded-xl px-4 py-2.5 flex items-center gap-3">
-      <div class="relative flex h-3 w-3">
-        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-        <span class="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
-      </div>
-      <div>
-        <h1 class="text-sm font-bold tracking-wider text-slate-100 uppercase">Gravitational N-Body Lab</h1>
-        <p class="text-[10px] text-sky-400 font-mono">3D Galaxy & Celestial Physics</p>
-      </div>
-    </div>
-
-    <!-- Preset Buttons -->
-    <div class="glass-panel pointer-events-auto rounded-xl p-1.5 flex flex-wrap items-center gap-1.5">
-      <button id="btnGalaxy" class="glass-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-200 hover:text-sky-300">
-        Galaxy Collision
-      </button>
-      <button id="btnSolar" class="glass-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-200 hover:text-sky-300">
-        Solar System
-      </button>
-      <button id="btnCloud" class="glass-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-200 hover:text-sky-300">
-        Star Cloud
-      </button>
-      <div class="h-4 w-px bg-slate-700 my-auto mx-1"></div>
-      <button id="pauseBtn" class="glass-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-400 hover:bg-amber-500/20">
-        Pause
-      </button>
-      <button id="resetBtn" class="glass-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-400 hover:bg-rose-500/20">
-        Reset
-      </button>
-    </div>
+  <!-- Header -->
+  <header class="fixed top-4 left-4 z-10 glass-panel p-4 rounded-xl shadow-2xl max-w-xs pointer-events-auto">
+    <h1 class="text-lg font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+      N-Body Gravity Lab
+    </h1>
+    <p class="text-xs text-gray-400 mt-1">Real-time gravitational particle dynamics</p>
   </header>
 
-  <!-- Left Side Control Panel -->
-  <aside id="controls" class="glass-panel custom-scroll absolute top-20 left-3 z-10 w-72 max-h-[calc(100vh-100px)] overflow-y-auto rounded-2xl p-4 flex flex-col gap-4">
-    <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
-      <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400">Simulation Parameters</h2>
-      <span class="text-[10px] font-mono bg-sky-500/10 text-sky-300 px-2 py-0.5 rounded border border-sky-500/20">Tablet Ready</span>
-    </div>
-
-    <!-- Particle Count -->
-    <div class="flex flex-col gap-1.5">
-      <div class="flex justify-between text-xs">
-        <label for="slider-particles" class="text-slate-300 font-medium">Particle Count</label>
-        <span id="slider-particles-val" class="font-mono text-sky-400 font-semibold">1200</span>
-      </div>
-      <input type="range" id="slider-particles" min="200" max="2500" step="100" value="1200">
-    </div>
-
-    <!-- Gravity G -->
-    <div class="flex flex-col gap-1.5">
-      <div class="flex justify-between text-xs">
-        <label for="slider-gravity" class="text-slate-300 font-medium">Gravity Constant (G)</label>
-        <span id="slider-gravity-val" class="font-mono text-sky-400 font-semibold">1.5</span>
-      </div>
-      <input type="range" id="slider-gravity" min="0.1" max="5.0" step="0.1" value="1.5">
-    </div>
-
-    <!-- Plummer Softening -->
-    <div class="flex flex-col gap-1.5">
-      <div class="flex justify-between text-xs">
-        <label for="slider-softening" class="text-slate-300 font-medium">Plummer Softening</label>
-        <span id="slider-softening-val" class="font-mono text-sky-400 font-semibold">120</span>
-      </div>
-      <input type="range" id="slider-softening" min="10" max="500" step="10" value="120">
-    </div>
-
-    <!-- Time Step dt -->
-    <div class="flex flex-col gap-1.5">
-      <div class="flex justify-between text-xs">
-        <label for="slider-dt" class="text-slate-300 font-medium">Time Step (dt)</label>
-        <span id="slider-dt-val" class="font-mono text-sky-400 font-semibold">0.012</span>
-      </div>
-      <input type="range" id="slider-dt" min="0.001" max="0.03" step="0.001" value="0.012">
-    </div>
-
-    <!-- Interactivity Hint -->
-    <div class="mt-1 bg-sky-950/40 border border-sky-500/20 rounded-xl p-3 flex items-start gap-2.5">
-      <svg class="w-4 h-4 text-sky-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-      </svg>
-      <p class="text-[11px] text-slate-300 leading-relaxed">
-        <strong class="text-sky-300">Interactive Attractor:</strong> Touch or click anywhere in 3D space to spawn a massive gravitational singularity!
-      </p>
-    </div>
-  </aside>
-
-  <!-- Right Side Telemetry & Energy Panel -->
-  <aside id="stats" class="glass-panel absolute bottom-3 right-3 z-10 w-72 rounded-2xl p-4 flex flex-col gap-3">
-    <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
-      <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400">Telemetry &amp; Energy</h2>
-      <span id="stat-fps" class="text-xs font-mono font-bold text-emerald-400">60 FPS</span>
-    </div>
-
-    <div class="grid grid-cols-2 gap-2 text-xs">
-      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5">
-        <p class="text-[10px] text-slate-400 uppercase tracking-wide">Calc Time</p>
-        <p id="stat-calc-time" class="font-mono text-sm font-semibold text-sky-300 mt-0.5">0.0 ms</p>
-      </div>
-      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5">
-        <p class="text-[10px] text-slate-400 uppercase tracking-wide">Energy Drift</p>
-        <p id="stat-drift" class="font-mono text-sm font-semibold text-amber-300 mt-0.5">0.00%</p>
+  <!-- Control Panel -->
+  <div class="fixed top-4 right-4 z-10 glass-panel p-4 rounded-xl shadow-2xl w-80 max-h-[90vh] overflow-y-auto pointer-events-auto text-sm space-y-4">
+    <div>
+      <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Presets</label>
+      <div class="grid grid-cols-3 gap-2">
+        <button onclick="window.sim.loadPreset('galaxy')" class="px-2 py-1.5 bg-cyan-600/30 border border-cyan-500/40 rounded-lg hover:bg-cyan-600/50 text-xs font-medium transition">Galaxy</button>
+        <button onclick="window.sim.loadPreset('solar')" class="px-2 py-1.5 bg-cyan-600/30 border border-cyan-500/40 rounded-lg hover:bg-cyan-600/50 text-xs font-medium transition">Solar System</button>
+        <button onclick="window.sim.loadPreset('cloud')" class="px-2 py-1.5 bg-cyan-600/30 border border-cyan-500/40 rounded-lg hover:bg-cyan-600/50 text-xs font-medium transition">Cloud</button>
       </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-2 text-xs">
-      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5">
-        <p class="text-[10px] text-emerald-400 font-semibold uppercase tracking-wide">Kinetic (E<sub>k</sub>)</p>
-        <p id="stat-ek" class="font-mono text-xs font-semibold text-slate-200 mt-0.5">0</p>
-      </div>
-      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5">
-        <p class="text-[10px] text-purple-400 font-semibold uppercase tracking-wide">Potential (E<sub>p</sub>)</p>
-        <p id="stat-ep" class="font-mono text-xs font-semibold text-slate-200 mt-0.5">0</p>
-      </div>
-    </div>
-
-    <!-- Energy Trend Sparkline Canvas -->
-    <div class="flex flex-col gap-1">
-      <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-        <span>ENERGY HISTORY</span>
-        <div class="flex items-center gap-2">
-          <span class="text-emerald-400">■ E<sub>k</sub></span>
-          <span class="text-purple-400">■ E<sub>p</sub></span>
+    <div class="space-y-3">
+      <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider">Parameters</label>
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-gray-400">Particles (N)</span>
+          <span id="slider-n-val" class="text-cyan-400 font-mono">3000</span>
         </div>
+        <input id="slider-n" type="range" min="500" max="10000" step="500" value="3000" class="w-full accent-cyan-500">
       </div>
-      <div class="w-full h-14 bg-slate-950/80 border border-slate-800/80 rounded-lg overflow-hidden">
-        <canvas id="energySparkline" class="w-full h-full block"></canvas>
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-gray-400">Gravity (G)</span>
+          <span id="slider-g-val" class="text-cyan-400 font-mono">1.0</span>
+        </div>
+        <input id="slider-g" type="range" min="0.1" max="5.0" step="0.1" value="1.0" class="w-full accent-cyan-500">
+      </div>
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-gray-400">Time Step (dt)</span>
+          <span id="slider-dt-val" class="text-cyan-400 font-mono">0.6</span>
+        </div>
+        <input id="slider-dt" type="range" min="0.1" max="2.0" step="0.1" value="0.6" class="w-full accent-cyan-500">
       </div>
     </div>
-  </aside>
 
-  <!-- JavaScript N-Body Simulation Engine -->
+    <!-- Telemetry Stats -->
+    <div class="pt-2 border-t border-gray-700/50 space-y-1 text-xs">
+      <div class="flex justify-between"><span class="text-gray-400">FPS:</span><span id="stat-fps" class="font-mono text-emerald-400">60 FPS</span></div>
+      <div class="flex justify-between"><span class="text-gray-400">Calc Time:</span><span id="stat-calc-time" class="font-mono text-cyan-400">0.0 ms</span></div>
+      <div class="flex justify-between"><span class="text-gray-400">Kinetic Energy:</span><span id="stat-kinetic" class="font-mono text-gray-300">0</span></div>
+      <div class="flex justify-between"><span class="text-gray-400">Potential Energy:</span><span id="stat-potential" class="font-mono text-gray-300">0</span></div>
+    </div>
+  </div>
+
+  <!-- Simulation Script -->
   <script>
-    class NBodySimulator {
-      constructor() {
-        this.maxN = 3000;
-        this.N = 1200;
-        this.G = 1.5;
-        this.softening = 120;
-        this.dt = 0.012;
-        this.isPaused = false;
+  class NBodySimulator {
+    constructor() {
+      this.maxN = 10000;
+      this.N = 3000;
+      this.G = 1.0;
+      this.dt = 0.6;
+      this.softening = 15.0;
+      this.paused = false;
 
-        // Physics Arrays (Structure of Arrays for Cache Friendliness)
-        this.posX = new Float32Array(this.maxN);
-        this.posY = new Float32Array(this.maxN);
-        this.posZ = new Float32Array(this.maxN);
-        this.velX = new Float32Array(this.maxN);
-        this.velY = new Float32Array(this.maxN);
-        this.velZ = new Float32Array(this.maxN);
-        this.accX = new Float32Array(this.maxN);
-        this.accY = new Float32Array(this.maxN);
-        this.accZ = new Float32Array(this.maxN);
-        this.mass = new Float32Array(this.maxN);
-        this.vMag = new Float32Array(this.maxN);
-        this.flatPos = new Float32Array(this.maxN * 3);
+      this.posX = new Float32Array(this.maxN);
+      this.posY = new Float32Array(this.maxN);
+      this.posZ = new Float32Array(this.maxN);
+      this.velX = new Float32Array(this.maxN);
+      this.velY = new Float32Array(this.maxN);
+      this.velZ = new Float32Array(this.maxN);
+      this.accX = new Float32Array(this.maxN);
+      this.accY = new Float32Array(this.maxN);
+      this.accZ = new Float32Array(this.maxN);
+      this.mass = new Float32Array(this.maxN);
 
-        // Interactive Gravitational Attractor
-        this.touchActive = false;
-        this.touchPos = new THREE.Vector3();
-
-        // Energy History for Sparkline
-        this.historyEk = new Float32Array(50);
-        this.historyEp = new Float32Array(50);
-        this.historyIndex = 0;
-        this.initialEnergy = 0;
-
-        // FPS & Timing
-        this.lastTime = performance.now();
-        this.frameCount = 0;
-
-        // Safe setup execution
-        try {
-          this.initThree();
-          this.initParticles();
-          this.initGrid();
-          this.initTouchControls();
-          this.initUI();
-          this.loadPreset('galaxy');
-          this.animate();
-        } catch (err) {
-          console.error("Simulation setup error: ", err);
-        }
-      }
-
-      initThree() {
-        const container = document.getElementById('canvas-container');
-        this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.FogExp2(0x030712, 0.0003);
-
-        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 12000);
-        this.camera.position.set(0, 700, 1000);
-
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-        this.renderer.setClearColor(0x030712, 1);
-        container.appendChild(this.renderer.domElement);
-
-        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.05;
-        this.controls.maxDistance = 4000;
-        this.controls.minDistance = 100;
-
-        window.addEventListener('resize', () => {
-          this.camera.aspect = window.innerWidth / window.innerHeight;
-          this.camera.updateProjectionMatrix();
-          this.renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-      }
-
-      initParticles() {
-        this.geometry = new THREE.BufferGeometry();
-        this.posAttr = new THREE.BufferAttribute(this.flatPos, 3);
-        this.vMagAttr = new THREE.BufferAttribute(this.vMag, 1);
-
-        this.geometry.setAttribute('position', this.posAttr);
-        this.geometry.setAttribute('vMag', this.vMagAttr);
-
-        // Custom Glowing Particle Shader
-        this.material = new THREE.ShaderMaterial({
-          vertexShader: `
-            attribute float vMag;
-            varying float vVelocity;
-            void main() {
-              vVelocity = vMag;
-              vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-              gl_PointSize = clamp(240.0 / -mvPosition.z, 2.5, 8.0);
-              gl_Position = projectionMatrix * mvPosition;
-            }
-          `,
-          fragmentShader: `
-            varying float vVelocity;
-            void main() {
-              float d = length(gl_PointCoord - vec2(0.5));
-              if (d > 0.5) discard;
-              float alpha = smoothstep(0.5, 0.0, d);
-              
-              // Velocity mapping: Blue -> Purple -> Gold -> White
-              float normV = clamp(vVelocity / 18.0, 0.0, 1.0);
-              vec3 color = mix(vec3(0.1, 0.6, 1.0), vec3(0.7, 0.2, 0.9), smoothstep(0.0, 0.4, normV));
-              color = mix(color, vec3(1.0, 0.8, 0.3), smoothstep(0.4, 0.8, normV));
-              color = mix(color, vec3(1.0, 1.0, 1.0), smoothstep(0.8, 1.0, normV));
-              
-              gl_FragColor = vec4(color, alpha * 0.95);
-            }
-          `,
-          transparent: true,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
-        });
-
-        this.points = new THREE.Points(this.geometry, this.material);
-        this.scene.add(this.points);
-      }
-
-      initGrid() {
-        const gridRadius = 1400;
-        const gridSegments = 32;
-        this.gridGeo = new THREE.PlaneGeometry(gridRadius * 2, gridRadius * 2, gridSegments, gridSegments);
-        this.gridGeo.rotateX(-Math.PI / 2);
-
-        this.gridOrigY = new Float32Array(this.gridGeo.attributes.position.count);
-        for (let i = 0; i < this.gridOrigY.length; i++) {
-          this.gridOrigY[i] = this.gridGeo.attributes.position.getY(i);
-        }
-
-        const gridMat = new THREE.MeshBasicMaterial({
-          color: 0x38bdf8,
-          wireframe: true,
-          transparent: true,
-          opacity: 0.12
-        });
-
-        this.gridMesh = new THREE.Mesh(this.gridGeo, gridMat);
-        this.gridMesh.position.y = -220;
-        this.scene.add(this.gridMesh);
-      }
-  initTouchControls() {
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-
-    const updateTouchPoint = (e) => {
-      // FIX 1: Safe touch extraction (prevents crash on touch release)
-      const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
-      const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
-
-      mouse.x = (clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, this.camera);
-      if (!this.touchPos) this.touchPos = new THREE.Vector3();
-      raycaster.ray.intersectPlane(plane, this.touchPos);
-    };
-
-    const onDown = (e) => {
-      if (e.target.closest('.glass-panel') || e.target.closest('header')) return;
-      this.touchActive = true;
-      updateTouchPoint(e);
-    };
-
-    const onMove = (e) => {
-      if (this.touchActive) updateTouchPoint(e);
-    };
-
-    const onUp = () => {
-      this.touchActive = false;
-    };
-
-    window.addEventListener('mousedown', onDown);
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    window.addEventListener('touchstart', onDown, { passive: true });
-    window.addEventListener('touchmove', onMove, { passive: true });
-    window.addEventListener('touchend', onUp);
-  }
-
-  loadPreset(type) {
-    for (let i = 0; i < this.maxN; i++) {
-      this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
-      this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
-      this.mass[i] = 1.0;
-    }
-
-    if (type === 'galaxy') {
-      // Two colliding spiral galaxies
-      const half = Math.floor(this.N / 2);
-      this.spawnGalaxy(0, -350, 0, 0, 0, 11, 0, half, 420);
-      this.spawnGalaxy(half, 350, 0, 0, 0, -11, 0, this.N - half, 420);
-    } else if (type === 'solar') {
-      // Central massive Star with circumstellar disk
-      this.mass[0] = 5000;
-      this.posX[0] = 0; this.posY[0] = 0; this.posZ[0] = 0;
-      this.velX[0] = 0; this.velY[0] = 0; this.velZ[0] = 0;
-
-      for (let i = 1; i < this.N; i++) {
-        const r = 120 + Math.random() * 750;
-        const a = Math.random() * Math.PI * 2;
-        this.posX[i] = r * Math.cos(a);
-        this.posZ[i] = r * Math.sin(a);
-        this.posY[i] = (Math.random() - 0.5) * 8;
-
-        const v = Math.sqrt((this.G * 5000) / r);
-        this.velX[i] = -v * Math.sin(a);
-        this.velZ[i] = v * Math.cos(a);
-        this.mass[i] = 0.5 + Math.random() * 2.0;
-      }
-    } else if (type === 'cloud') {
-      // Spherical turbulent cluster
-      for (let i = 0; i < this.N; i++) {
-        const r = Math.cbrt(Math.random()) * 550;
-        const a = Math.random() * Math.PI * 2;
-        const p = Math.acos(2 * Math.random() - 1);
-
-        this.posX[i] = r * Math.sin(p) * Math.cos(a);
-        this.posY[i] = r * Math.sin(p) * Math.sin(a);
-        this.posZ[i] = r * Math.cos(p);
-
-        this.velX[i] = -this.posZ[i] * 0.05 + (Math.random() - 0.5) * 0.5;
-        this.velY[i] = (Math.random() - 0.5) * 0.5;
-        this.velZ[i] = this.posX[i] * 0.05 + (Math.random() - 0.5) * 0.5;
-        this.mass[i] = 1.0 + Math.random() * 3.0;
-      }
-    }
-
-    // FIX 2: Removed non-existent this.computeEnergies() call that caused crashes
-  }
-
-  spawnGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
-    // Supermassive Core
-    this.mass[offset] = 3500;
-    this.posX[offset] = cx; this.posY[offset] = cy; this.posZ[offset] = cz;
-    this.velX[offset] = vx; this.velY[offset] = vy; this.velZ[offset] = vz;
-
-    for (let i = 1; i < count; i++) {
-      const idx = offset + i;
-      const r = Math.sqrt(Math.random()) * radius + 25;
-      const a = Math.random() * Math.PI * 2;
-
-      this.posX[idx] = cx + r * Math.cos(a);
-      this.posY[idx] = cy + (Math.random() - 0.5) * 14;
-      this.posZ[idx] = cz + r * Math.sin(a);
-
-      const v = Math.sqrt((this.G * 3500) / r);
-      this.velX[idx] = -v * Math.sin(a) + vx;
-      this.velY[idx] = (Math.random() - 0.5) * 2 + vy;
-      this.velZ[idx] = v * Math.cos(a) + vz;
-
-      this.mass[idx] = 1.0;
-
-      const color = new THREE.Color().setHSL(0.55 + (r / 400) * 0.25, 0.85, 0.6);
-      this.colors[idx * 3] = color.r;
-      this.colors[idx * 3 + 1] = color.g;
-      this.colors[idx * 3 + 2] = color.b;
-    }
-
-    this.geometry.attributes.position.needsUpdate = true;
-    this.geometry.attributes.color.needsUpdate = true;
-  }
-
-  updatePhysics() {
-    const N = this.N;
-    const dt = this.dt;
-    const G = this.G;
-    const eps2 = this.softening * this.softening;
-
-    let totalKinetic = 0;
-    let totalPotential = 0;
-
-    // Reset accelerations
-    for (let i = 0; i < N; i++) {
-      this.accX[i] = 0;
-      this.accY[i] = 0;
-      this.accZ[i] = 0;
-    }
-
-    // Compute N-body gravitational forces
-    for (let i = 0; i < N; i++) {
-      const xi = this.posX[i];
-      const yi = this.posY[i];
-      const zi = this.posZ[i];
-      const mi = this.mass[i];
-
-      for (let j = i + 1; j < N; j++) {
-        const dx = this.posX[j] - xi;
-        const dy = this.posY[j] - yi;
-        const dz = this.posZ[j] - zi;
-        const distSq = dx * dx + dy * dy + dz * dz + eps2;
-        const dist = Math.sqrt(distSq);
-        const invDist3 = 1.0 / (distSq * dist);
-
-        const f = G * invDist3;
-        const fx = f * dx;
-        const fy = f * dy;
-        const fz = f * dz;
-
-        this.accX[i] += fx * this.mass[j];
-        this.accY[i] += fy * this.mass[j];
-        this.accZ[i] += fz * this.mass[j];
-
-        this.accX[j] -= fx * mi;
-        this.accY[j] -= fy * mi;
-        this.accZ[j] -= fz * mi;
-
-        totalPotential -= (G * mi * this.mass[j]) / dist;
-      }
-
-      // FIX 3: Touch/Mouse Attractor physics application
-      if (this.touchActive && this.touchPos) {
-        const dx = this.touchPos.x - xi;
-        const dy = this.touchPos.y - yi;
-        const dz = this.touchPos.z - zi;
-        const distSq = dx * dx + dy * dy + dz * dz + eps2;
-        const dist = Math.sqrt(distSq);
-        const invDist3 = 1.0 / (distSq * dist);
-        const touchMass = 10000;
-        const f = G * touchMass * invDist3;
-
-        this.accX[i] += f * dx;
-        this.accY[i] += f * dy;
-        this.accZ[i] += f * dz;
-      }
-    }
-
-    // FIX 4: Moved posAttr buffer reference outside the loop for high FPS performance
-    const posAttr = this.geometry.attributes.position.array;
-
-    // Symplectic Integration
-    for (let i = 0; i < N; i++) {
-      this.velX[i] += this.accX[i] * dt;
-      this.velY[i] += this.accY[i] * dt;
-      this.velZ[i] += this.accZ[i] * dt;
-
-      this.posX[i] += this.velX[i] * dt;
-      this.posY[i] += this.velY[i] * dt;
-      this.posZ[i] += this.velZ[i] * dt;
-
-      const speedSq = this.velX[i] ** 2 + this.velY[i] ** 2 + this.velZ[i] ** 2;
-      totalKinetic += 0.5 * this.mass[i] * speedSq;
-
-      posAttr[i * 3] = this.posX[i];
-      posAttr[i * 3 + 1] = this.posY[i];
-      posAttr[i * 3 + 2] = this.posZ[i];
-    }
-
-    this.geometry.attributes.position.needsUpdate = true;
-
-    // Telemetry updates
-    const kEl = document.getElementById('stat-kinetic');
-    if (kEl) kEl.innerText = Math.round(totalKinetic).toLocaleString();
-    const pEl = document.getElementById('stat-potential');
-    if (pEl) pEl.innerText = Math.round(totalPotential).toLocaleString();
-  }
-
-  bindSlider(id, prop, transform = parseFloat) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('input', (e) => {
-      this[prop] = transform(e.target.value);
-      const valEl = document.getElementById(id + '-val');
-      if (valEl) valEl.innerText = e.target.value;
-      if (prop === 'N') this.resetSimulation();
-    });
-  }
-
-  animate() {
-    requestAnimationFrame(() => this.animate());
-    if (this.paused) return;
-
-    const t0 = performance.now();
-    this.updatePhysics();
-    const tCalc = performance.now() - t0;
-
-    this.controls.update();
-    this.renderer.render(this.scene, this.camera);
-
-    this.frameCount++;
-    const now = performance.now();
-    if (now - this.lastTime >= 1000) {
-      const fpsEl = document.getElementById('stat-fps');
-      if (fpsEl) fpsEl.innerText = Math.round((this.frameCount * 1000) / (now - this.lastTime)) + ' FPS';
-      const calcEl = document.getElementById('stat-calc-time');
-      if (calcEl) calcEl.innerText = tCalc.toFixed(1) + ' ms';
       this.frameCount = 0;
-      this.lastTime = now;
+      this.lastTime = performance.now();
+
+      this.initThree();
+      this.initGrid();
+      this.initTouchControls();
+      this.bindControls();
+      this.loadPreset('galaxy');
+      this.animate();
+    }
+
+    initThree() {
+      this.scene = new THREE.Scene();
+      this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
+      this.camera.position.set(0, 400, 700);
+
+      this.renderer = new THREE.WebGLRenderer({ antialias: true });
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      document.body.appendChild(this.renderer.domElement);
+
+      this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+      this.controls.enableDamping = true;
+      this.controls.dampingFactor = 0.05;
+
+      this.geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(this.maxN * 3);
+      this.colors = new Float32Array(this.maxN * 3);
+
+      this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 3,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false
+      });
+
+      this.particles = new THREE.Points(this.geometry, material);
+      this.scene.add(this.particles);
+
+      window.addEventListener('resize', () => {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    }
+
+    initGrid() {
+      this.gridGeo = new THREE.PlaneGeometry(1200, 1200, 40, 40);
+      this.gridGeo.rotateX(-Math.PI / 2);
+
+      const gridMat = new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.12
+      });
+
+      this.gridMesh = new THREE.Mesh(this.gridGeo, gridMat);
+      this.gridMesh.position.y = -220;
+      this.scene.add(this.gridMesh);
+    }
+
+    initTouchControls() {
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+      const updateTouchPoint = (e) => {
+        const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+        const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+
+        mouse.x = (clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, this.camera);
+        if (!this.touchPos) this.touchPos = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, this.touchPos);
+      };
+
+      const onDown = (e) => {
+        if (e.target.closest('.glass-panel') || e.target.closest('header')) return;
+        this.touchActive = true;
+        updateTouchPoint(e);
+      };
+
+      const onMove = (e) => {
+        if (this.touchActive) updateTouchPoint(e);
+      };
+
+      const onUp = () => {
+        this.touchActive = false;
+      };
+
+      window.addEventListener('mousedown', onDown);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      window.addEventListener('touchstart', onDown, { passive: true });
+      window.addEventListener('touchmove', onMove, { passive: true });
+      window.addEventListener('touchend', onUp);
+    }
+
+    loadPreset(type) {
+      for (let i = 0; i < this.maxN; i++) {
+        this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
+        this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
+        this.mass[i] = 1.0;
+      }
+
+      if (type === 'galaxy') {
+        const half = Math.floor(this.N / 2);
+        this.spawnGalaxy(0, -350, 0, 0, 0, 11, 0, half, 420);
+        this.spawnGalaxy(half, 350, 0, 0, 0, -11, 0, this.N - half, 420);
+      } else if (type === 'solar') {
+        this.mass[0] = 5000;
+        this.posX[0] = 0; this.posY[0] = 0; this.posZ[0] = 0;
+        this.velX[0] = 0; this.velY[0] = 0; this.velZ[0] = 0;
+
+        for (let i = 1; i < this.N; i++) {
+          const r = 120 + Math.random() * 750;
+          const a = Math.random() * Math.PI * 2;
+          this.posX[i] = r * Math.cos(a);
+          this.posZ[i] = r * Math.sin(a);
+          this.posY[i] = (Math.random() - 0.5) * 8;
+
+          const v = Math.sqrt((this.G * 5000) / r);
+          this.velX[i] = -v * Math.sin(a);
+          this.velZ[i] = v * Math.cos(a);
+          this.mass[i] = 0.5 + Math.random() * 2.0;
+        }
+      } else if (type === 'cloud') {
+        for (let i = 0; i < this.N; i++) {
+          const r = Math.cbrt(Math.random()) * 550;
+          const a = Math.random() * Math.PI * 2;
+          const p = Math.acos(2 * Math.random() - 1);
+
+          this.posX[i] = r * Math.sin(p) * Math.cos(a);
+          this.posY[i] = r * Math.sin(p) * Math.sin(a);
+          this.posZ[i] = r * Math.cos(p);
+
+          this.velX[i] = -this.posZ[i] * 0.05 + (Math.random() - 0.5) * 0.5;
+          this.velY[i] = (Math.random() - 0.5) * 0.5;
+          this.velZ[i] = this.posX[i] * 0.05 + (Math.random() - 0.5) * 0.5;
+          this.mass[i] = 1.0 + Math.random() * 3.0;
+        }
+      }
+    }
+
+    spawnGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
+      this.mass[offset] = 3500;
+      this.posX[offset] = cx; this.posY[offset] = cy; this.posZ[offset] = cz;
+      this.velX[offset] = vx; this.velY[offset] = vy; this.velZ[offset] = vz;
+
+      for (let i = 1; i < count; i++) {
+        const idx = offset + i;
+        const r = Math.sqrt(Math.random()) * radius + 25;
+        const a = Math.random() * Math.PI * 2;
+
+        this.posX[idx] = cx + r * Math.cos(a);
+        this.posY[idx] = cy + (Math.random() - 0.5) * 14;
+        this.posZ[idx] = cz + r * Math.sin(a);
+
+        const v = Math.sqrt((this.G * 3500) / r);
+        this.velX[idx] = -v * Math.sin(a) + vx;
+        this.velY[idx] = (Math.random() - 0.5) * 2 + vy;
+        this.velZ[idx] = v * Math.cos(a) + vz;
+
+        this.mass[idx] = 1.0;
+
+        const color = new THREE.Color().setHSL(0.55 + (r / 400) * 0.25, 0.85, 0.6);
+        this.colors[idx * 3] = color.r;
+        this.colors[idx * 3 + 1] = color.g;
+        this.colors[idx * 3 + 2] = color.b;
+      }
+
+      this.geometry.attributes.position.needsUpdate = true;
+      this.geometry.attributes.color.needsUpdate = true;
+    }
+
+    updatePhysics() {
+      const N = this.N;
+      const dt = this.dt;
+      const G = this.G;
+      const eps2 = this.softening * this.softening;
+
+      let totalKinetic = 0;
+      let totalPotential = 0;
+
+      for (let i = 0; i < N; i++) {
+        this.accX[i] = 0;
+        this.accY[i] = 0;
+        this.accZ[i] = 0;
+      }
+
+      for (let i = 0; i < N; i++) {
+        const xi = this.posX[i];
+        const yi = this.posY[i];
+        const zi = this.posZ[i];
+        const mi = this.mass[i];
+
+        for (let j = i + 1; j < N; j++) {
+          const dx = this.posX[j] - xi;
+          const dy = this.posY[j] - yi;
+          const dz = this.posZ[j] - zi;
+          const distSq = dx * dx + dy * dy + dz * dz + eps2;
+          const dist = Math.sqrt(distSq);
+          const invDist3 = 1.0 / (distSq * dist);
+
+          const f = G * invDist3;
+          const fx = f * dx;
+          const fy = f * dy;
+          const fz = f * dz;
+
+          this.accX[i] += fx * this.mass[j];
+          this.accY[i] += fy * this.mass[j];
+          this.accZ[i] += fz * this.mass[j];
+
+          this.accX[j] -= fx * mi;
+          this.accY[j] -= fy * mi;
+          this.accZ[j] -= fz * mi;
+
+          totalPotential -= (G * mi * this.mass[j]) / dist;
+        }
+
+        if (this.touchActive && this.touchPos) {
+          const dx = this.touchPos.x - xi;
+          const dy = this.touchPos.y - yi;
+          const dz = this.touchPos.z - zi;
+          const distSq = dx * dx + dy * dy + dz * dz + eps2;
+          const dist = Math.sqrt(distSq);
+          const invDist3 = 1.0 / (distSq * dist);
+          const touchMass = 10000;
+          const f = G * touchMass * invDist3;
+
+          this.accX[i] += f * dx;
+          this.accY[i] += f * dy;
+          this.accZ[i] += f * dz;
+        }
+      }
+
+      const posAttr = this.geometry.attributes.position.array;
+
+      for (let i = 0; i < N; i++) {
+        this.velX[i] += this.accX[i] * dt;
+        this.velY[i] += this.accY[i] * dt;
+        this.velZ[i] += this.accZ[i] * dt;
+
+        this.posX[i] += this.velX[i] * dt;
+        this.posY[i] += this.velY[i] * dt;
+        this.posZ[i] += this.velZ[i] * dt;
+
+        const speedSq = this.velX[i] ** 2 + this.velY[i] ** 2 + this.velZ[i] ** 2;
+        totalKinetic += 0.5 * this.mass[i] * speedSq;
+
+        posAttr[i * 3] = this.posX[i];
+        posAttr[i * 3 + 1] = this.posY[i];
+        posAttr[i * 3 + 2] = this.posZ[i];
+      }
+
+      this.geometry.attributes.position.needsUpdate = true;
+
+      const kEl = document.getElementById('stat-kinetic');
+      if (kEl) kEl.innerText = Math.round(totalKinetic).toLocaleString();
+      const pEl = document.getElementById('stat-potential');
+      if (pEl) pEl.innerText = Math.round(totalPotential).toLocaleString();
+    }
+
+    bindControls() {
+      const bind = (id, prop, transform = parseFloat) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', (e) => {
+          this[prop] = transform(e.target.value);
+          const valEl = document.getElementById(id + '-val');
+          if (valEl) valEl.innerText = e.target.value;
+          if (prop === 'N') this.loadPreset('galaxy');
+        });
+      };
+
+      bind('slider-n', 'N', parseInt);
+      bind('slider-g', 'G');
+      bind('slider-dt', 'dt');
+    }
+
+    animate() {
+      requestAnimationFrame(() => this.animate());
+      if (this.paused) return;
+
+      const t0 = performance.now();
+      this.updatePhysics();
+      const tCalc = performance.now() - t0;
+
+      this.controls.update();
+      this.renderer.render(this.scene, this.camera);
+
+      this.frameCount++;
+      const now = performance.now();
+      if (now - this.lastTime >= 1000) {
+        const fpsEl = document.getElementById('stat-fps');
+        if (fpsEl) fpsEl.innerText = Math.round((this.frameCount * 1000) / (now - this.lastTime)) + ' FPS';
+        const calcEl = document.getElementById('stat-calc-time');
+        if (calcEl) calcEl.innerText = tCalc.toFixed(1) + ' ms';
+        this.frameCount = 0;
+        this.lastTime = now;
+      }
     }
   }
-}
 
-window.addEventListener('DOMContentLoaded', () => {
-  new NBodySimulator();
-});
-</script>
+  window.addEventListener('DOMContentLoaded', () => {
+    window.sim = new NBodySimulator();
+  });
+  </script>
 </body>
 </html>
-
-                    
