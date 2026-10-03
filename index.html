@@ -112,6 +112,7 @@
 
       this.frameCount = 0;
       this.lastTime = performance.now();
+      this.currentPreset = 'galaxy';
 
       this.initThree();
       this.initGrid();
@@ -180,6 +181,7 @@
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
       const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      this.touchPos = new THREE.Vector3();
 
       const updateTouchPoint = (e) => {
         const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
@@ -189,7 +191,6 @@
         mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
         raycaster.setFromCamera(mouse, this.camera);
-        if (!this.touchPos) this.touchPos = new THREE.Vector3();
         raycaster.ray.intersectPlane(plane, this.touchPos);
       };
 
@@ -215,12 +216,23 @@
       window.addEventListener('touchend', onUp);
     }
 
+    setDefaultColors() {
+      for (let i = 0; i < this.maxN; i++) {
+        this.colors[i * 3] = 0.2;
+        this.colors[i * 3 + 1] = 0.6;
+        this.colors[i * 3 + 2] = 1.0;
+      }
+    }
+
     loadPreset(type) {
+      this.currentPreset = type;
       for (let i = 0; i < this.maxN; i++) {
         this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
         this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
         this.mass[i] = 1.0;
       }
+
+      this.setDefaultColors();
 
       if (type === 'galaxy') {
         const half = Math.floor(this.N / 2);
@@ -230,6 +242,8 @@
         this.mass[0] = 5000;
         this.posX[0] = 0; this.posY[0] = 0; this.posZ[0] = 0;
         this.velX[0] = 0; this.velY[0] = 0; this.velZ[0] = 0;
+
+        this.colors[0] = 1.0; this.colors[1] = 0.8; this.colors[2] = 0.2;
 
         for (let i = 1; i < this.N; i++) {
           const r = 120 + Math.random() * 750;
@@ -259,6 +273,12 @@
           this.mass[i] = 1.0 + Math.random() * 3.0;
         }
       }
+
+      if (this.geometry) {
+        this.geometry.setDrawRange(0, this.N);
+        if (this.geometry.attributes.position) this.geometry.attributes.position.needsUpdate = true;
+        if (this.geometry.attributes.color) this.geometry.attributes.color.needsUpdate = true;
+      }
     }
 
     spawnGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
@@ -287,9 +307,6 @@
         this.colors[idx * 3 + 1] = color.g;
         this.colors[idx * 3 + 2] = color.b;
       }
-
-      this.geometry.attributes.position.needsUpdate = true;
-      this.geometry.attributes.color.needsUpdate = true;
     }
 
     updatePhysics() {
@@ -388,7 +405,7 @@
           this[prop] = transform(e.target.value);
           const valEl = document.getElementById(id + '-val');
           if (valEl) valEl.innerText = e.target.value;
-          if (prop === 'N') this.loadPreset('galaxy');
+          if (prop === 'N') this.loadPreset(this.currentPreset);
         });
       };
 
@@ -421,7 +438,7 @@
     }
   }
 
-  window.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('load', () => {
     window.sim = new NBodySimulator();
   });
   </script>
