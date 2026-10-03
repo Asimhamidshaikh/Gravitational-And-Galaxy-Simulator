@@ -1,690 +1,877 @@
 ```html
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full w-full select-none">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chronos-N: 3D Galaxy & Gravitational Simulator</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>3D Gravitational & Galaxy Simulator (Tablet & Touch Optimized)</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Font Awesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Three.js and OrbitControls -->
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Google Fonts: Inter -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+
+  <!-- External Libraries for 3D and Graphing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  
-  <!-- Google Fonts (Inter & JetBrains Mono) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body {
       font-family: 'Inter', sans-serif;
+      touch-action: none; /* Disables default mobile pull-to-refresh & pinch zoom */
       background-color: #030712;
       color: #f3f4f6;
       overflow: hidden;
-      user-select: none;
-    }
-    
-    .font-mono {
-      font-family: 'JetBrains Mono', monospace;
     }
 
-    /* Glassmorphism panel styling */
+    /* Glassmorphism Styling */
     .glass-panel {
       background: rgba(15, 23, 42, 0.75);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
     }
 
-    .glass-panel-subtle {
-      background: rgba(15, 23, 42, 0.45);
+    .glass-card {
+      background: rgba(30, 41, 59, 0.6);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    /* Custom range slider styling */
+    /* Touch-friendly inputs & custom sliders */
     input[type=range] {
       -webkit-appearance: none;
-      background: transparent;
-    }
-    input[type=range]:focus {
+      appearance: none;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 9999px;
+      height: 8px;
       outline: none;
     }
-    input[type=range]::-webkit-slider-runnable-track {
-      width: 100%;
-      height: 6px;
-      cursor: pointer;
-      background: #1e293b;
-      border-radius: 9999px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
+
     input[type=range]::-webkit-slider-thumb {
-      height: 16px;
-      width: 16px;
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
       background: #38bdf8;
       cursor: pointer;
-      -webkit-appearance: none;
-      margin-top: -5px;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
-      transition: all 0.15s ease;
-    }
-    input[type=range]::-webkit-slider-thumb:hover {
-      transform: scale(1.2);
-      background: #38bdf8;
-      box-shadow: 0 0 15px rgba(56, 189, 248, 1);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+      border: 2px solid #ffffff;
     }
 
-    /* Custom Scrollbar */
+    /* Custom Scrollbars for panel */
     ::-webkit-scrollbar {
-      width: 4px;
+      width: 6px;
     }
     ::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.5);
+      background: rgba(0, 0, 0, 0.2);
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(56, 189, 248, 0.3);
-      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
     }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(56, 189, 248, 0.6);
+
+    /* Pulse animation for status indicator */
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.1); }
+    }
+    .pulse-dot {
+      animation: pulse-glow 2s infinite ease-in-out;
     }
   </style>
 </head>
-<body class="relative w-screen h-screen overflow-hidden">
+<body class="h-full w-full relative overflow-hidden flex flex-col justify-between">
 
-  <!-- Main Canvas Container -->
-  <div id="canvas-container" class="absolute inset-0 z-0"></div>
+  <!-- WebGL Canvas Container -->
+  <div id="canvas-container" class="absolute inset-0 w-full h-full z-0"></div>
 
-  <!-- Top Navigation Header -->
-  <header class="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-4 pointer-events-none">
-    <!-- Brand Title -->
-    <div class="glass-panel px-5 py-3 rounded-2xl flex items-center space-x-3 pointer-events-auto border-cyan-500/30">
-      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-        <i class="fa-solid font-bold text-white text-lg fa-atom animate-spin-slow"></i>
-      </div>
+  <!-- HUD Top Bar (Stats & Mode) -->
+  <header class="relative z-10 p-3 md:p-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-3 pointer-events-auto shadow-lg">
+      <div class="w-3 h-3 rounded-full bg-cyan-400 pulse-dot shadow-[0_0_8px_#22d3ee]"></div>
       <div>
-        <h1 class="text-base font-bold tracking-wider text-white flex items-center gap-2">
-          CHRONOS-N <span class="text-xs font-mono font-normal px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">v3.0 SafeEngine</span>
+        <h1 class="text-sm md:text-base font-bold tracking-wide text-white flex items-center gap-2">
+          CHRONOS <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold">3D N-BODY</span>
         </h1>
-        <p class="text-[10px] text-slate-400 font-medium">N-Body Gravitational & Spacetime Dynamics</p>
+        <p class="text-[10px] md:text-xs text-gray-400">Tablet & Touch Optimized</p>
       </div>
     </div>
 
-    <!-- Presets Selector Bar -->
-    <div class="glass-panel px-3 py-2 rounded-2xl flex items-center space-x-2 pointer-events-auto overflow-x-auto">
-      <button id="btn-preset-galaxy" class="preset-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition flex items-center gap-2">
-        <i class="fa-solid fa-circle-nodes"></i> Galactic Collision
-      </button>
-      <button id="btn-preset-solar" class="preset-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800/60 hover:text-white transition flex items-center gap-2">
-        <i class="fa-solid fa-sun text-amber-400"></i> Solar System
-      </button>
-      <button id="btn-preset-accretion" class="preset-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800/60 hover:text-white transition flex items-center gap-2">
-        <i class="fa-solid fa-compact-disc text-purple-400"></i> Accretion Disk
-      </button>
-      <button id="btn-preset-cloud" class="preset-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800/60 hover:text-white transition flex items-center gap-2">
-        <i class="fa-solid fa-cloud-moon text-emerald-400"></i> Protostellar Cloud
-      </button>
-    </div>
-
-    <!-- System Status Badge -->
-    <div class="glass-panel px-4 py-2 rounded-2xl flex items-center space-x-3 pointer-events-auto">
-      <div class="flex items-center space-x-2">
-        <span id="status-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span id="status-text" class="text-xs font-mono text-emerald-300 font-medium">STABLE</span>
+    <!-- Live Performance Stats Badges -->
+    <div class="flex items-center gap-2 pointer-events-auto">
+      <div class="glass-panel px-3 py-1.5 rounded-xl text-center">
+        <span class="block text-[10px] uppercase tracking-wider text-gray-400">FPS</span>
+        <span id="stat-fps" class="text-xs md:text-sm font-bold text-emerald-400">60</span>
       </div>
+      <div class="glass-panel px-3 py-1.5 rounded-xl text-center">
+        <span class="block text-[10px] uppercase tracking-wider text-gray-400">Particles</span>
+        <span id="stat-count" class="text-xs md:text-sm font-bold text-cyan-400">1000</span>
+      </div>
+      <div class="glass-panel px-3 py-1.5 rounded-xl text-center hidden sm:block">
+        <span class="block text-[10px] uppercase tracking-wider text-gray-400">Calc Time</span>
+        <span id="stat-calc" class="text-xs md:text-sm font-bold text-amber-400">0.0 ms</span>
+      </div>
+      
+      <!-- Drawer Toggle Button -->
+      <button id="toggle-panel-btn" class="glass-panel w-11 h-11 rounded-2xl flex items-center justify-center text-cyan-300 hover:text-white hover:bg-slate-800/80 active:scale-95 transition-all pointer-events-auto">
+        <i class="fa-solid fa-sliders text-lg"></i>
+      </button>
     </div>
   </header>
 
-  <!-- Left Side Floating Control Panel -->
-  <aside class="absolute top-24 left-4 bottom-6 w-80 z-10 glass-panel rounded-2xl p-4 flex flex-col justify-between overflow-y-auto pointer-events-auto shadow-2xl">
-    <div class="space-y-5">
-      <!-- Section Header -->
-      <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-          <i class="fa-solid fa-sliders text-cyan-400"></i> Simulation Parameters
-        </h2>
-        <span class="text-[10px] text-slate-500 font-mono">Float32 Safety On</span>
+  <!-- Collapsible Floating Control Panel Drawer -->
+  <aside id="control-panel" class="fixed right-3 top-16 bottom-20 z-20 w-80 md:w-96 glass-panel rounded-3xl p-4 flex flex-col gap-4 shadow-2xl transition-transform duration-300 translate-x-[110%] md:translate-x-0 overflow-y-auto">
+    
+    <!-- Header inside drawer -->
+    <div class="flex items-center justify-between pb-2 border-b border-white/10">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-microchip text-cyan-400"></i>
+        <h2 class="font-bold text-sm md:text-base text-white">Simulation Controls</h2>
+      </div>
+      <button id="close-panel-btn" class="text-gray-400 hover:text-white p-2 rounded-xl text-lg md:hidden">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex bg-slate-900/60 p-1 rounded-2xl border border-white/5">
+      <button id="tab-btn-presets" class="flex-1 py-2 text-xs font-semibold rounded-xl text-cyan-400 bg-slate-800/80 shadow transition-all">Presets</button>
+      <button id="tab-btn-physics" class="flex-1 py-2 text-xs font-semibold rounded-xl text-gray-400 hover:text-white transition-all">Physics</button>
+      <button id="tab-btn-chart" class="flex-1 py-2 text-xs font-semibold rounded-xl text-gray-400 hover:text-white transition-all">Energy</button>
+    </div>
+
+    <!-- Tab 1: Presets -->
+    <div id="tab-content-presets" class="flex flex-col gap-2.5">
+      <label class="text-xs font-medium text-gray-300 flex items-center gap-1.5">
+        <i class="fa-solid fa-galaxy text-purple-400"></i> Cosmic Scenarios
+      </label>
+      
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btn-preset-galaxy" class="glass-card hover:bg-cyan-500/20 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center gap-1.5 border-cyan-500/30 text-cyan-300">
+          <i class="fa-solid fa-atom text-xl"></i>
+          <span class="text-xs font-semibold">Galaxy Collision</span>
+        </button>
+        
+        <button id="btn-preset-solar" class="glass-card hover:bg-amber-500/20 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center gap-1.5 text-gray-300">
+          <i class="fa-solid fa-sun text-xl text-amber-400"></i>
+          <span class="text-xs font-semibold">Solar System</span>
+        </button>
+        
+        <button id="btn-preset-figure8" class="glass-card hover:bg-indigo-500/20 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center gap-1.5 text-gray-300">
+          <i class="fa-solid fa-infinity text-xl text-indigo-400"></i>
+          <span class="text-xs font-semibold">Figure-8 Orbits</span>
+        </button>
+        
+        <button id="btn-preset-cloud" class="glass-card hover:bg-emerald-500/20 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center gap-1.5 text-gray-300">
+          <i class="fa-solid fa-cloud text-xl text-emerald-400"></i>
+          <span class="text-xs font-semibold">Protostellar Cloud</span>
+        </button>
       </div>
 
-      <!-- Main Action Controls -->
-      <div class="grid grid-cols-3 gap-2">
-        <button id="btn-toggle-pause" class="py-2.5 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/30">
-          <i id="icon-pause" class="fa-solid fa-pause"></i> <span id="label-pause">Pause</span>
-        </button>
-        <button id="btn-step" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition flex items-center justify-center gap-1">
-          <i class="fa-solid fa-forward-step"></i> Step
-        </button>
-        <button id="btn-reset" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-rose-950 hover:text-rose-300 text-slate-300 font-semibold text-xs border border-slate-700 hover:border-rose-800/50 transition flex items-center justify-center gap-1">
-          <i class="fa-solid fa-rotate-left"></i> Reset
-        </button>
+      <!-- Device Performance Mode Selector -->
+      <div class="mt-2 glass-card p-3 rounded-2xl flex flex-col gap-2">
+        <label class="text-xs font-medium text-gray-300 flex items-center justify-between">
+          <span>Tablet Profile</span>
+          <span id="profile-label" class="text-[10px] text-cyan-400 font-bold uppercase">Tablet Mode (1000)</span>
+        </label>
+        <div class="grid grid-cols-3 gap-1 bg-slate-950/60 p-1 rounded-xl">
+          <button id="btn-profile-mobile" class="py-1.5 text-[11px] font-medium rounded-lg text-gray-400 hover:text-white">Mobile (500)</button>
+          <button id="btn-profile-tablet" class="py-1.5 text-[11px] font-medium rounded-lg text-cyan-400 bg-slate-800 shadow">Tablet (1000)</button>
+          <button id="btn-profile-desktop" class="py-1.5 text-[11px] font-medium rounded-lg text-gray-400 hover:text-white">High (2000)</button>
+        </div>
       </div>
+    </div>
 
+    <!-- Tab 2: Physics Controls -->
+    <div id="tab-content-physics" class="hidden flex-col gap-4">
       <!-- Particle Count Slider -->
-      <div class="space-y-1.5">
-        <div class="flex justify-between items-center text-xs">
-          <label class="text-slate-300 font-medium flex items-center gap-1.5">
-            <i class="fa-solid fa-users text-cyan-400 text-[10px]"></i> Particle Count (N)
-          </label>
-          <span id="val-particles" class="font-mono text-cyan-400 font-bold">1200</span>
+      <div class="flex flex-col gap-1.5">
+        <div class="flex justify-between text-xs">
+          <span class="text-gray-300">Particle Count</span>
+          <span id="val-particles" class="font-bold text-cyan-400">1000</span>
         </div>
-        <input id="slider-particles" type="range" min="200" max="3000" step="100" value="1200">
-        <div class="flex justify-between text-[10px] text-slate-500 font-mono">
-          <span>200</span>
-          <span>1500</span>
-          <span>3000</span>
-        </div>
+        <input id="slider-particles" type="range" min="200" max="2500" step="100" value="1000" class="w-full min-h-[44px] cursor-pointer" />
       </div>
 
-      <!-- Gravitational Constant G Slider -->
-      <div class="space-y-1.5">
-        <div class="flex justify-between items-center text-xs">
-          <label class="text-slate-300 font-medium flex items-center gap-1.5">
-            <i class="fa-solid fa-magnet text-amber-400 text-[10px]"></i> Gravity Constant (G)
-          </label>
-          <span id="val-g" class="font-mono text-amber-400 font-bold">1.2</span>
+      <!-- Gravitational Constant G -->
+      <div class="flex flex-col gap-1.5">
+        <div class="flex justify-between text-xs">
+          <span class="text-gray-300">Gravity Strength (G)</span>
+          <span id="val-G" class="font-bold text-amber-400">1.5</span>
         </div>
-        <input id="slider-g" type="range" min="0.1" max="5.0" step="0.1" value="1.2">
+        <input id="slider-G" type="range" min="0.1" max="5.0" step="0.1" value="1.5" class="w-full min-h-[44px] cursor-pointer" />
       </div>
 
-      <!-- Force Softening Slider -->
-      <div class="space-y-1.5">
-        <div class="flex justify-between items-center text-xs">
-          <label class="text-slate-300 font-medium flex items-center gap-1.5">
-            <i class="fa-solid fa-shield-halved text-emerald-400 text-[10px]"></i> Softening ($\epsilon^2$)
-          </label>
-          <span id="val-softening" class="font-mono text-emerald-400 font-bold">250</span>
+      <!-- Time Step Delta T -->
+      <div class="flex flex-col gap-1.5">
+        <div class="flex justify-between text-xs">
+          <span class="text-gray-300">Time Step ($\Delta t$)</span>
+          <span id="val-dt" class="font-bold text-emerald-400">0.15</span>
         </div>
-        <input id="slider-softening" type="range" min="50" max="600" step="10" value="250">
-        <p class="text-[10px] text-slate-500">Prevents infinity divide singularities on close contact.</p>
+        <input id="slider-dt" type="range" min="0.01" max="0.5" step="0.01" value="0.15" class="w-full min-h-[44px] cursor-pointer" />
       </div>
 
-      <!-- Time Step (dt) Slider -->
-      <div class="space-y-1.5">
-        <div class="flex justify-between items-center text-xs">
-          <label class="text-slate-300 font-medium flex items-center gap-1.5">
-            <i class="fa-solid fa-stopwatch text-purple-400 text-[10px]"></i> Time Step ($\Delta t$)
-          </label>
-          <span id="val-dt" class="font-mono text-purple-400 font-bold">0.12</span>
+      <!-- Softening Factor -->
+      <div class="flex flex-col gap-1.5">
+        <div class="flex justify-between text-xs">
+          <span class="text-gray-300">Distance Softening ($\epsilon$)</span>
+          <span id="val-softening" class="font-bold text-purple-400">15.0</span>
         </div>
-        <input id="slider-dt" type="range" min="0.02" max="0.30" step="0.01" value="0.12">
+        <input id="slider-softening" type="range" min="2.0" max="50.0" step="1.0" value="15.0" class="w-full min-h-[44px] cursor-pointer" />
       </div>
 
-      <!-- Velocity Cap Slider -->
-      <div class="space-y-1.5">
-        <div class="flex justify-between items-center text-xs">
-          <label class="text-slate-300 font-medium flex items-center gap-1.5">
-            <i class="fa-solid fa-gauge-high text-rose-400 text-[10px]"></i> Max Speed Cap
-          </label>
-          <span id="val-vmax" class="font-mono text-rose-400 font-bold">120</span>
-        </div>
-        <input id="slider-vmax" type="range" min="40" max="300" step="10" value="120">
-      </div>
-
-      <!-- Visual Toggles -->
-      <div class="pt-2 border-t border-slate-700/60 space-y-2">
-        <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
-          <span class="flex items-center gap-2"><i class="fa-solid fa-border-all text-cyan-400"></i> Spacetime Curvature Grid</span>
-          <input id="toggle-grid" type="checkbox" checked class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
-        </label>
-        <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
-          <span class="flex items-center gap-2"><i class="fa-solid fa-hand-pointer text-amber-400"></i> Mouse Gravity Well</span>
-          <input id="toggle-attractor" type="checkbox" checked class="w-4 h-4 accent-amber-500 rounded cursor-pointer">
-        </label>
+      <!-- Spacetime Grid Toggle -->
+      <div class="flex items-center justify-between glass-card p-3 rounded-2xl">
+        <span class="text-xs font-medium text-gray-300">Spacetime Grid Distortion</span>
+        <input id="toggle-grid" type="checkbox" checked class="w-5 h-5 accent-cyan-400 rounded cursor-pointer min-h-[44px]" />
       </div>
     </div>
 
-    <!-- Mouse Interaction Info -->
-    <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 space-y-1">
-      <div class="flex items-center gap-1.5 text-cyan-300 font-semibold">
-        <i class="fa-solid fa-circle-info"></i> Mouse Attractor:
+    <!-- Tab 3: Energy Analytics -->
+    <div id="tab-content-chart" class="hidden flex-col gap-3">
+      <div class="glass-card p-3 rounded-2xl h-48 relative">
+        <canvas id="energyChart"></canvas>
       </div>
-      <p class="leading-relaxed">Click & Hold anywhere in 3D space to pull surrounding particles into a massive gravity sink.</p>
-    </div>
-  </aside>
 
-  <!-- Right Telemetry HUD -->
-  <aside class="absolute top-24 right-4 z-10 w-72 glass-panel rounded-2xl p-4 pointer-events-auto space-y-4 shadow-2xl">
-    <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-      <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-        <i class="fa-solid fa-chart-line text-cyan-400"></i> Live Telemetry
-      </h2>
-      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">REALTIME</span>
-    </div>
-
-    <!-- Readout Grid -->
-    <div class="grid grid-cols-2 gap-2">
-      <div class="glass-panel-subtle p-2.5 rounded-xl">
-        <span class="text-[10px] text-slate-400 block mb-0.5">FPS Counter</span>
-        <span id="stat-fps" class="text-lg font-mono font-bold text-emerald-400">60</span>
-      </div>
-      <div class="glass-panel-subtle p-2.5 rounded-xl">
-        <span class="text-[10px] text-slate-400 block mb-0.5">Physics Compute</span>
-        <span id="stat-ms" class="text-lg font-mono font-bold text-cyan-400">1.2ms</span>
-      </div>
-      <div class="glass-panel-subtle p-2.5 rounded-xl">
-        <span class="text-[10px] text-slate-400 block mb-0.5">Active Bodies</span>
-        <span id="stat-active" class="text-lg font-mono font-bold text-slate-200">1200</span>
-      </div>
-      <div class="glass-panel-subtle p-2.5 rounded-xl">
-        <span class="text-[10px] text-slate-400 block mb-0.5">Sanitized NaNs</span>
-        <span id="stat-sanitized" class="text-lg font-mono font-bold text-emerald-400">0</span>
-      </div>
-    </div>
-
-    <!-- Energy Dynamics Monitor -->
-    <div class="space-y-2 pt-2 border-t border-slate-700/60">
-      <div class="flex justify-between items-center text-xs">
-        <span class="text-slate-400">Kinetic Energy ($E_k$)</span>
-        <span id="stat-ek" class="font-mono text-emerald-400 font-semibold">0.00</span>
-      </div>
-      <div class="flex justify-between items-center text-xs">
-        <span class="text-slate-400">Potential Energy ($E_p$)</span>
-        <span id="stat-ep" class="font-mono text-purple-400 font-semibold">0.00</span>
-      </div>
-      <div class="flex justify-between items-center text-xs pt-1 border-t border-slate-800">
-        <span class="text-slate-200 font-semibold">Total Energy ($E_t$)</span>
-        <span id="stat-et" class="font-mono text-amber-400 font-bold">0.00</span>
-      </div>
-    </div>
-
-    <!-- Mini Visualizer Canvas for Energy Stability -->
-    <div class="space-y-1">
-      <div class="flex justify-between text-[10px] text-slate-400">
-        <span>Energy Conservation Curve</span>
-        <span id="stat-drift-pct" class="text-cyan-400 font-mono">Drift: 0.0%</span>
-      </div>
-      <div class="w-full h-16 glass-panel-subtle rounded-xl p-1 relative overflow-hidden">
-        <canvas id="energy-chart-canvas" class="w-full h-full block"></canvas>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div class="glass-card p-2.5 rounded-xl">
+          <span class="text-[10px] text-gray-400 block">Kinetic Energy ($E_k$)</span>
+          <span id="stat-ek" class="font-bold text-cyan-400">0</span>
+        </div>
+        <div class="glass-card p-2.5 rounded-xl">
+          <span class="text-[10px] text-gray-400 block">Potential Energy ($E_p$)</span>
+          <span id="stat-ep" class="font-bold text-rose-400">0</span>
+        </div>
+        <div class="glass-card p-2.5 rounded-xl">
+          <span class="text-[10px] text-gray-400 block">Total Energy ($E_t$)</span>
+          <span id="stat-et" class="font-bold text-amber-400">0</span>
+        </div>
+        <div class="glass-card p-2.5 rounded-xl">
+          <span class="text-[10px] text-gray-400 block">Energy Drift</span>
+          <span id="stat-drift" class="font-bold text-emerald-400">0.00%</span>
+        </div>
       </div>
     </div>
   </aside>
 
-  <!-- Attractor Cursor Indicator (Virtual 3D overlay ring) -->
-  <div id="attractor-hud" class="fixed pointer-events-none z-20 hidden transform -translate-x-1/2 -translate-y-1/2">
-    <div class="w-12 h-12 rounded-full border-2 border-dashed border-amber-400/80 animate-spin-slow flex items-center justify-center">
-      <div class="w-3 h-3 rounded-full bg-amber-400 shadow-lg shadow-amber-400"></div>
+  <!-- Bottom Quick Controls Bar -->
+  <footer class="relative z-10 p-3 md:p-4 flex items-center justify-center gap-3 pointer-events-none">
+    <div class="glass-panel px-4 py-2 rounded-full flex items-center gap-3 shadow-2xl pointer-events-auto">
+      <!-- Play/Pause Button -->
+      <button id="btn-play-pause" class="w-12 h-12 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold flex items-center justify-center shadow-lg shadow-cyan-500/30 active:scale-90 transition-all text-lg">
+        <i class="fa-solid fa-pause" id="play-icon"></i>
+      </button>
+
+      <!-- Reset Simulation Button -->
+      <button id="btn-reset" class="w-11 h-11 rounded-full bg-slate-800 hover:bg-slate-700 text-cyan-300 flex items-center justify-center active:scale-90 transition-all text-base border border-white/10">
+        <i class="fa-solid fa-rotate-right"></i>
+      </button>
+
+      <div class="w-px h-6 bg-white/15"></div>
+
+      <!-- Touch Gravity Interaction Mode Toggle -->
+      <button id="btn-touch-attract" class="px-3.5 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-gray-300 flex items-center gap-2 active:scale-95 transition-all text-xs font-semibold border border-white/10">
+        <i class="fa-solid fa-hand-pointer text-cyan-400"></i>
+        <span id="attract-label" class="hidden sm:inline">Gravity Touch: OFF</span>
+      </button>
+
+      <!-- Camera Reset Button -->
+      <button id="btn-camera-reset" class="w-11 h-11 rounded-full bg-slate-800 hover:bg-slate-700 text-gray-300 flex items-center justify-center active:scale-90 transition-all text-base border border-white/10">
+        <i class="fa-solid fa-video"></i>
+      </button>
+    </div>
+  </footer>
+
+  <!-- WebGL Context Lost Warning Modal -->
+  <div id="context-lost-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+    <div class="glass-panel p-6 rounded-3xl max-w-sm flex flex-col items-center gap-4 border-rose-500/40">
+      <div class="w-12 h-12 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400 text-2xl">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 class="text-lg font-bold text-white">GPU Context Lost</h3>
+      <p class="text-xs text-gray-300">Your tablet GPU freed memory. Automatically restoring simulation rendering...</p>
+      <button id="btn-reload-context" class="px-5 py-2.5 bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold rounded-xl shadow-lg active:scale-95 transition-all">
+        Restore Context
+      </button>
     </div>
   </div>
 
   <script>
-    /**
-     * CHRONOS-N SIMULATION ENGINE
-     * Designed with strict NaN sanitation, bounded velocities, and distance softening
-     * to eliminate WebGL crashes and black screen renderer failures.
-     */
+  /* Barnes-Hut Octree Node Pool for 0-Garbage-Collection Tablet Physics */
+  class OctreeNode {
+    constructor() {
+      this.cx = 0; this.cy = 0; this.cz = 0;
+      this.size = 0;
+      this.mass = 0;
+      this.comX = 0; this.comY = 0; this.comZ = 0;
+      this.children = new Array(8).fill(null);
+      this.particleIdx = -1;
+      this.isLeaf = true;
+    }
 
-    class SafeNBodyEngine {
-      constructor(maxParticles = 3000) {
-        this.maxParticles = maxParticles;
-        this.particleCount = 1200;
+    reset(cx, cy, cz, size) {
+      this.cx = cx; this.cy = cy; this.cz = cz;
+      this.size = size;
+      this.mass = 0;
+      this.comX = 0; this.comY = 0; this.comZ = 0;
+      this.particleIdx = -1;
+      this.isLeaf = true;
+      for (let i = 0; i < 8; i++) this.children[i] = null;
+    }
+  }
 
-        // Physics Parameters
-        this.G = 1.2;
-        this.softening = 250.0; // Distance softening epsilon^2
-        this.dt = 0.12;
-        this.maxVelocity = 120.0;
-        this.boundsLimit = 8000.0;
+  class OctreePool {
+    constructor(maxNodes = 10000) {
+      this.pool = Array.from({ length: maxNodes }, () => new OctreeNode());
+      this.index = 0;
+    }
 
-        // Particle State Arrays (TypedArrays for high cache locality)
-        this.posX = new Float32Array(this.maxParticles);
-        this.posY = new Float32Array(this.maxParticles);
-        this.posZ = new Float32Array(this.maxParticles);
+    getNode(cx, cy, cz, size) {
+      if (this.index >= this.pool.length) {
+        this.pool.push(new OctreeNode());
+      }
+      const node = this.pool[this.index++];
+      node.reset(cx, cy, cz, size);
+      return node;
+    }
 
-        this.velX = new Float32Array(this.maxParticles);
-        this.velY = new Float32Array(this.maxParticles);
-        this.velZ = new Float32Array(this.maxParticles);
+    clear() {
+      this.index = 0;
+    }
+  }
 
-        this.accX = new Float32Array(this.maxParticles);
-        this.accY = new Float32Array(this.maxParticles);
-        this.accZ = new Float32Array(this.maxParticles);
+  /* Main Chronos 3D Simulation Controller */
+  class ChronosSimulation {
+    constructor() {
+      this.particleCount = 1000;
+      this.G = 1.5;
+      this.dt = 0.15;
+      this.softening = 15.0; // Distance softening to prevent NaN/Infinity
+      this.theta = 0.7;      // Barnes-Hut accuracy threshold
+      this.isPaused = false;
+      this.touchAttractMode = false;
+      this.showGrid = true;
 
-        this.mass = new Float32Array(this.maxParticles);
-        this.vMag = new Float32Array(this.maxParticles);
+      // Particle Buffers (Float32 TypedArrays for hardware speed)
+      this.maxParticles = 3000;
+      this.posX = new Float32Array(this.maxParticles);
+      this.posY = new Float32Array(this.maxParticles);
+      this.posZ = new Float32Array(this.maxParticles);
+      this.velX = new Float32Array(this.maxParticles);
+      this.velY = new Float32Array(this.maxParticles);
+      this.velZ = new Float32Array(this.maxParticles);
+      this.accX = new Float32Array(this.maxParticles);
+      this.accY = new Float32Array(this.maxParticles);
+      this.accZ = new Float32Array(this.maxParticles);
+      this.mass = new Float32Array(this.maxParticles);
+      this.vMag = new Float32Array(this.maxParticles);
 
-        // Flattened position array for Three.js BufferAttribute
-        this.flatPositions = new Float32Array(this.maxParticles * 3);
+      // Barnes-Hut Pool
+      this.nodePool = new OctreePool(12000);
 
-        // Attractor State
-        this.attractorActive = false;
-        this.attractorPos = new THREE.Vector3(0, 0, 0);
-        this.attractorMass = 20000.0;
+      // Mouse/Touch Pointer interaction plane
+      this.mousePos = new THREE.Vector3(0, 0, 0);
+      this.mouseActive = false;
+      this.raycaster = new THREE.Raycaster();
+      this.pointer = new THREE.Vector2();
+      this.interactionPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-        // Metrics & Counters
-        this.sanitizedCount = 0;
-        this.kineticEnergy = 0;
-        this.potentialEnergy = 0;
-        this.totalEnergy = 0;
-        this.initialEnergy = 0;
+      // Energy Analytics Trackers
+      this.initialEnergy = 0;
+      this.energyHistoryLength = 30;
+
+      // Initialize
+      this.initWebGL();
+      this.initSpacetimeGrid();
+      this.initParticles();
+      this.initChart();
+      this.initEventListeners();
+      this.loadPreset('galaxy');
+
+      this.animate();
+    }
+
+    initWebGL() {
+      const container = document.getElementById('canvas-container');
+
+      // 3D Scene
+      this.scene = new THREE.Scene();
+      this.scene.fog = new THREE.FogExp2(0x030712, 0.0008);
+
+      // Camera
+      this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
+      this.camera.position.set(0, 350, 650);
+
+      // WebGL Renderer setup with Mobile Context-Loss Safety
+      this.renderer = new THREE.WebGLRenderer({
+        antialias: window.innerWidth > 768, // Disable AA on small mobile screens for performance
+        powerPreference: 'high-performance',
+        alpha: false
+      });
+
+      // KEY MOBILE OPTIMIZATION: Cap Pixel Ratio to 1.0 or max 1.5 to prevent memory crashes
+      const safeDPR = Math.min(window.devicePixelRatio || 1, 1.5);
+      this.renderer.setPixelRatio(safeDPR);
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.renderer.setClearColor(0x030712, 1);
+      container.appendChild(this.renderer.domElement);
+
+      // Orbit Controls
+      this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+      this.controls.enableDamping = true;
+      this.controls.dampingFactor = 0.05;
+      this.controls.rotateSpeed = 0.8;
+      this.controls.zoomSpeed = 1.0;
+      this.controls.maxDistance = 3000;
+      this.controls.minDistance = 50;
+
+      // Ambient & Directional Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      this.scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
+      dirLight.position.set(200, 500, 300);
+      this.scene.add(dirLight);
+    }
+
+    initSpacetimeGrid() {
+      const gridRadius = 1200;
+      const gridSegments = 40;
+      this.gridGeo = new THREE.PlaneGeometry(gridRadius, gridRadius, gridSegments, gridSegments);
+      this.gridGeo.rotateX(-Math.PI / 2);
+
+      // Save initial un-warped positions
+      this.gridOriginalY = new Float32Array(this.gridGeo.attributes.position.count);
+      const posAttr = this.gridGeo.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+                this.gridOriginalY[i] = posAttr.getY(i);
       }
 
-      loadPreset(presetName) {
-        const N = this.particleCount;
+      this.gridMat = new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.15
+      });
 
-        // Reset arrays
-        for (let i = 0; i < this.maxParticles; i++) {
-          this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
-          this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
-          this.accX[i] = 0; this.accY[i] = 0; this.accZ[i] = 0;
-          this.mass[i] = 1.0;
-          this.vMag[i] = 0;
-        }
+      this.gridMesh = new THREE.Mesh(this.gridGeo, this.gridMat);
+      this.gridMesh.position.y = -250;
+      this.scene.add(this.gridMesh);
+    }
 
-        if (presetName === 'galaxy') {
-          // Two colliding disk galaxies
-          const half = Math.floor(N / 2);
-          this.spawnGalaxyDisk(0, half, -450, 0, 0, 0, 15, -8, 650, 2500);
-          this.spawnGalaxyDisk(half, N, 450, 0, 0, 0, -15, 8, 650, 2500);
-        } else if (presetName === 'solar') {
-          // Central massive Sun with surrounding planets
-          this.mass[0] = 12000.0;
-          this.posX[0] = 0; this.posY[0] = 0; this.posZ[0] = 0;
-          this.velX[0] = 0; this.velY[0] = 0; this.velZ[0] = 0;
+    initParticles() {
+      this.geometry = new THREE.BufferGeometry();
+      this.posAttr = new THREE.BufferAttribute(this.flatPosBuffer, 3);
+      this.vMagAttr = new THREE.BufferAttribute(this.vMag, 1);
 
-          for (let i = 1; i < N; i++) {
-            const r = 120 + Math.random() * 1100;
-            const angle = Math.random() * Math.PI * 2;
-            
-            this.posX[i] = r * Math.cos(angle);
-            this.posZ[i] = r * Math.sin(angle);
-            this.posY[i] = (Math.random() - 0.5) * 15;
+      this.geometry.setAttribute('position', this.posAttr);
+      this.geometry.setAttribute('vMag', this.vMagAttr);
 
-            // Orbital Keplerian speed v = sqrt(G * M / r)
-            const v = Math.sqrt((this.G * 12000.0) / r);
-            this.velX[i] = -v * Math.sin(angle);
-            this.velZ[i] = v * Math.cos(angle);
-            this.velY[i] = (Math.random() - 0.5) * 0.5;
-
-            this.mass[i] = 0.5 + Math.random() * 2.5;
+      this.material = new THREE.ShaderMaterial({
+        vertexShader: `
+          attribute float vMag;
+          varying float vVelocity;
+          void main() {
+            vVelocity = vMag;
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            // Touch/tablet dynamic particle size scaling
+            gl_PointSize = clamp(180.0 / -mvPosition.z, 2.0, 8.0);
+            gl_Position = projectionMatrix * mvPosition;
           }
-        } else if (presetName === 'accretion') {
-          // Central Black Hole with high-velocity spiraling disk
-          this.mass[0] = 25000.0;
-          for (let i = 1; i < N; i++) {
-            const r = 80 + Math.pow(Math.random(), 1.5) * 900;
-            const angle = Math.random() * Math.PI * 2;
+        `,
+        fragmentShader: `
+          varying float vVelocity;
+          void main() {
+            float d = length(gl_PointCoord - vec2(0.5));
+            if (d > 0.5) discard;
+            float alpha = smoothstep(0.5, 0.0, d);
+            float normV = clamp(vVelocity / 15.0, 0.0, 1.0);
 
-            this.posX[i] = r * Math.cos(angle);
-            this.posZ[i] = r * Math.sin(angle);
-            this.posY[i] = (Math.random() - 0.5) * (r * 0.05);
+            vec3 colorLow = vec3(0.0, 0.6, 1.0);
+            vec3 colorMid = vec3(0.6, 0.2, 0.9);
+            vec3 colorHigh = vec3(1.0, 0.8, 0.2);
 
-            const v = Math.sqrt((this.G * 25000.0) / r) * 1.05;
-            this.velX[i] = -v * Math.sin(angle);
-            this.velZ[i] = v * Math.cos(angle);
-            this.mass[i] = 0.8 + Math.random() * 1.5;
+            vec3 color = mix(colorLow, colorMid, smoothstep(0.0, 0.5, normV));
+            color = mix(color, colorHigh, smoothstep(0.5, 1.0, normV));
+
+            gl_FragColor = vec4(color, alpha * 0.95);
           }
-        } else if (presetName === 'cloud') {
-          // Protostellar Cloud collapse
-          for (let i = 0; i < N; i++) {
-            const u = Math.random();
-            const r = Math.cbrt(u) * 850;
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
 
-            this.posX[i] = r * Math.sin(phi) * Math.cos(theta);
-            this.posY[i] = r * Math.sin(phi) * Math.sin(theta);
-            this.posZ[i] = r * Math.cos(phi);
-
-            // Slight initial rotation
-            const rotSpeed = 0.08;
-            this.velX[i] = -this.posZ[i] * rotSpeed + (Math.random() - 0.5) * 0.5;
-            this.velY[i] = (Math.random() - 0.5) * 0.5;
-            this.velZ[i] = this.posX[i] * rotSpeed + (Math.random() - 0.5) * 0.5;
-
-                    this.mass[i] = 0.5 + Math.random() * 1.5;
-      }
+      this.particleSystem = new THREE.Points(this.geometry, this.material);
+      this.scene.add(this.particleSystem);
     }
 
-    this.computeEnergies(true);
-  }
+    initTouchAndMouse() {
+      this.raycaster = new THREE.Raycaster();
+      this.mouseVec = new THREE.Vector2();
+      this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      this.touchPos = new THREE.Vector3();
 
-  spawnGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
-    this.mass[offset] = 4000;
-    this.posX[offset] = cx; this.posY[offset] = cy; this.posZ[offset] = cz;
-    this.velX[offset] = vx; this.velY[offset] = vy; this.velZ[offset] = vz;
-
-    for (let i = 1; i < count; i++) {
-      const idx = offset + i;
-      const r = Math.sqrt(Math.random()) * radius + 40;
-      const angle = Math.random() * Math.PI * 2;
-
-      this.posX[idx] = cx + r * Math.cos(angle);
-      this.posY[idx] = cy + (Math.random() - 0.5) * 20;
-      this.posZ[idx] = cz + r * Math.sin(angle);
-
-      const v = Math.sqrt((this.G * 4000) / r);
-      this.velX[idx] = vx - v * Math.sin(angle);
-      this.velY[idx] = vy;
-      this.velZ[idx] = vz + v * Math.cos(angle);
-      this.mass[idx] = 1.0;
-    }
-  }
-
-  updatePhysics() {
-    if (this.isPaused) return;
-
-    const N = this.particleCount;
-    for (let i = 0; i < N; i++) {
-      this.accX[i] = 0; this.accY[i] = 0; this.accZ[i] = 0;
-    }
-
-    this.tree.build(this.posX, this.posY, this.posZ, this.mass, N);
-
-    for (let i = 0; i < N; i++) {
-      this.tree.calculateForce(
-        this.tree.root, i, this.posX, this.posY, this.posZ,
-        this.accX, this.accY, this.accZ,
-        this.theta, this.G, this.softening, this.enableRelativity
-      );
-    }
-
-    // Mouse Attractor Force
-    if (this.mouseActive) {
-      for (let i = 0; i < N; i++) {
-        const dx = this.mousePos.x - this.posX[i];
-        const dy = this.mousePos.y - this.posY[i];
-        const dz = this.mousePos.z - this.posZ[i];
-        const distSq = dx * dx + dy * dy + dz * dz + 400;
-        const dist = Math.sqrt(distSq);
-        const f = (this.G * 15000) / distSq;
-        this.accX[i] += (dx / dist) * f;
-        this.accY[i] += (dy / dist) * f;
-        this.accZ[i] += (dz / dist) * f;
-      }
-    }
-
-    // Symplectic Integrator with Numerical Stabilization
-    const maxV = 120.0;
-    for (let i = 0; i < N; i++) {
-      this.velX[i] += this.accX[i] * this.dt;
-      this.velY[i] += this.accY[i] * this.dt;
-      this.velZ[i] += this.accZ[i] * this.dt;
-
-      // Velocity Clamping to prevent numerical explosion
-      const vSq = this.velX[i]**2 + this.velY[i]**2 + this.velZ[i]**2;
-      if (vSq > maxV * maxV) {
-        const scale = maxV / Math.sqrt(vSq);
-        this.velX[i] *= scale;
-        this.velY[i] *= scale;
-        this.velZ[i] *= scale;
-      }
-
-      this.posX[i] += this.velX[i] * this.dt;
-      this.posY[i] += this.velY[i] * this.dt;
-      this.posZ[i] += this.velZ[i] * this.dt;
-
-      // NaN Sanitization & Spatial Bounds Safety Check
-      if (!Number.isFinite(this.posX[i]) || !Number.isFinite(this.posY[i]) || !Number.isFinite(this.posZ[i]) ||
-          Math.abs(this.posX[i]) > 8000 || Math.abs(this.posY[i]) > 8000 || Math.abs(this.posZ[i]) > 8000) {
-        this.posX[i] = (Math.random() - 0.5) * 500;
-        this.posY[i] = (Math.random() - 0.5) * 500;
-        this.posZ[i] = (Math.random() - 0.5) * 500;
-        this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
-      }
-
-      const vx = this.velX[i], vy = this.velY[i], vz = this.velZ[i];
-      this.vMag[i] = Math.sqrt(vx * vx + vy * vy + vz * vz);
-
-      this.flatPosBuffer[i * 3] = this.posX[i];
-      this.flatPosBuffer[i * 3 + 1] = this.posY[i];
-      this.flatPosBuffer[i * 3 + 2] = this.posZ[i];
-    }
-
-    this.geometry.attributes.position.needsUpdate = true;
-    this.geometry.attributes.vMag.needsUpdate = true;
-    this.geometry.setDrawRange(0, N);
-
-    this.updateSpacetimeGrid();
-    this.computeEnergies(false);
-  }
-
-  updateSpacetimeGrid() {
-    if (!this.gridGeo) return;
-    const posArr = this.gridGeo.attributes.position.array;
-    const origArr = this.gridOriginalPos.array;
-    const N = this.particleCount;
-
-    for (let i = 0; i < posArr.length; i += 3) {
-      const gx = origArr[i];
-      const gz = origArr[i + 2];
-      let dip = 0;
-
-      for (let p = 0; p < Math.min(N, 15); p++) {
-        if (this.mass[p] > 300) {
-          const dx = gx - this.posX[p];
-          const dz = gz - this.posZ[p];
-          const distSq = dx * dx + dz * dz + 10000;
-          dip += (this.mass[p] * 70) / Math.sqrt(distSq);
+      const getScreenPos = (e) => {
+        if (e.touches && e.touches.length > 0) {
+          return { x: e.touches[0].clientX, y: e.touches[0].clientY };
         }
-      }
-      posArr[i + 1] = origArr[i + 1] - Math.min(dip, 400);
+        return { x: e.clientX, y: e.clientY };
+      };
+
+      const handlePointerStart = (e) => {
+        if (e.target.closest('#controlPanel') || e.target.closest('#statsPanel') || e.target.closest('#presetToolbar')) return;
+        
+        const pos = getScreenPos(e);
+        this.mouseVec.x = (pos.x / window.innerWidth) * 2 - 1;
+        this.mouseVec.y = -(pos.y / window.innerHeight) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouseVec, this.camera);
+        if (this.raycaster.ray.intersectPlane(this.plane, this.touchPos)) {
+          this.touchActive = true;
+        }
+      };
+
+      const handlePointerMove = (e) => {
+        if (!this.touchActive) return;
+        const pos = getScreenPos(e);
+        this.mouseVec.x = (pos.x / window.innerWidth) * 2 - 1;
+        this.mouseVec.y = -(pos.y / window.innerHeight) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouseVec, this.camera);
+        this.raycaster.ray.intersectPlane(this.plane, this.touchPos);
+      };
+
+      const handlePointerEnd = () => {
+        this.touchActive = false;
+      };
+
+      window.addEventListener('mousedown', handlePointerStart);
+      window.addEventListener('mousemove', handlePointerMove);
+      window.addEventListener('mouseup', handlePointerEnd);
+
+      window.addEventListener('touchstart', handlePointerStart, { passive: true });
+      window.addEventListener('touchmove', handlePointerMove, { passive: true });
+      window.addEventListener('touchend', handlePointerEnd);
     }
-    this.gridGeo.attributes.position.needsUpdate = true;
-  }
 
-  computeEnergies(setInitial = false) {
-    let ek = 0;
-    let ep = 0;
-    const N = this.particleCount;
-
-    for (let i = 0; i < N; i++) {
-      ek += 0.5 * this.mass[i] * (this.velX[i] ** 2 + this.velY[i] ** 2 + this.velZ[i] ** 2);
-    }
-
-    for (let i = 0; i < Math.min(N, 100); i++) {
-      for (let j = i + 1; j < Math.min(N, 100); j++) {
-        const dx = this.posX[j] - this.posX[i];
-        const dy = this.posY[j] - this.posY[i];
-        const dz = this.posZ[j] - this.posZ[i];
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz + this.softening);
-        ep -= (this.G * this.mass[i] * this.mass[j]) / dist;
-      }
-    }
-
-    const et = ek + ep;
-    if (setInitial || this.initialEnergy === 0 || !Number.isFinite(this.initialEnergy)) {
-      this.initialEnergy = et;
-    }
-
-    const drift = Math.abs((et - this.initialEnergy) / (this.initialEnergy || 1)) * 100;
-
-    const elEk = document.getElementById('stat-ek');
-    const elEp = document.getElementById('stat-ep');
-    const elEt = document.getElementById('stat-et');
-    const elDrift = document.getElementById('stat-drift');
-
-    if (elEk) elEk.innerText = ek.toFixed(0);
-    if (elEp) elEp.innerText = ep.toFixed(0);
-    if (elEt) elEt.innerText = et.toFixed(0);
-    if (elDrift) elDrift.innerText = (Number.isFinite(drift) ? drift.toFixed(2) : '0.00') + '%';
-
-    if (this.chart && this.frameCount % 10 === 0) {
-      const datasets = this.chart.data.datasets;
-      datasets[0].data.shift(); datasets[0].data.push(ek);
-      datasets[1].data.shift(); datasets[1].data.push(ep);
-      datasets[2].data.shift(); datasets[2].data.push(et);
-      this.chart.update('none');
-    }
-  }
-
-  initUI() {
-    this.lastTime = performance.now();
-    this.frameCount = 0;
-
-    const pauseBtn = document.getElementById('pauseBtn');
-    if (pauseBtn) {
-      pauseBtn.addEventListener('click', () => {
-        this.isPaused = !this.isPaused;
-        pauseBtn.innerText = this.isPaused ? 'Resume' : 'Pause';
+    initChart() {
+      const ctx = document.getElementById('energyChart');
+      if (!ctx) return;
+      
+      this.chart = new Chart(ctx.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: Array(20).fill(''),
+          datasets: [
+            { label: 'Kinetic', data: Array(20).fill(0), borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+            { label: 'Potential', data: Array(20).fill(0), borderColor: '#a855f7', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+            { label: 'Total', data: Array(20).fill(0), borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0, tension: 0.3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: { display: false }
+          }
+        }
       });
     }
 
-    const resetBtn = document.getElementById('resetBtn');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => this.loadPreset('galaxy'));
+    loadPreset(presetName) {
+      const N = this.particleCount;
+      for (let i = 0; i < this.maxParticles; i++) {
+        this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
+        this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
+        this.mass[i] = 1.0;
+      }
+
+      if (presetName === 'galaxy') {
+        const half = Math.floor(N / 2);
+        this.spawnGalaxy(0, -450, 0, 0, 0, 15, 0, -10, half, 550);
+        this.spawnGalaxy(half, 450, 0, 0, 0, -15, 0, N - half, 550);
+      } else if (presetName === 'solar') {
+        this.mass[0] = 8000;
+        for (let i = 1; i < N; i++) {
+          const r = 120 + Math.random() * 950;
+          const angle = Math.random() * Math.PI * 2;
+          this.posX[i] = r * Math.cos(angle);
+          this.posZ[i] = r * Math.sin(angle);
+          this.posY[i] = (Math.random() - 0.5) * 8;
+
+          const v = Math.sqrt((this.G * 8000) / r);
+          this.velX[i] = -v * Math.sin(angle);
+          this.velZ[i] = v * Math.cos(angle);
+          this.mass[i] = 0.5 + Math.random() * 2.0;
+        }
+      } else if (presetName === 'cloud') {
+        for (let i = 0; i < N; i++) {
+          const u = Math.random();
+          const r = Math.cbrt(u) * 750;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+
+          this.posX[i] = r * Math.sin(phi) * Math.cos(theta);
+          this.posY[i] = r * Math.sin(phi) * Math.sin(theta);
+          this.posZ[i] = r * Math.cos(phi);
+
+          const rotSpeed = 0.08;
+          this.velX[i] = -this.posZ[i] * rotSpeed + (Math.random() - 0.5) * 0.5;
+          this.velY[i] = (Math.random() - 0.5) * 0.5;
+          this.velZ[i] = this.posX[i] * rotSpeed + (Math.random() - 0.5) * 0.5;
+          this.mass[i] = 0.8 + Math.random() * 1.5;
+        }
+      }
+
+      this.computeEnergies(true);
     }
 
-    const bindBtn = (id, preset) => {
-      const btn = document.getElementById(id);
-      if (btn) btn.addEventListener('click', () => this.loadPreset(preset));
-    };
+    spawnGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
+      this.mass[offset] = 3500;
+      this.posX[offset] = cx; this.posY[offset] = cy; this.posZ[offset] = cz;
+      this.velX[offset] = vx; this.velY[offset] = vy; this.velZ[offset] = vz;
 
-    bindBtn('btnGalaxy', 'galaxy');
-    bindBtn('btnSolar', 'solar');
-    bindBtn('btnFigure8', 'figure8');
-    bindBtn('btnCloud', 'cloud');
+      for (let i = 1; i < count; i++) {
+        const idx = offset + i;
+        const r = Math.sqrt(Math.random()) * radius + 35;
+        const angle = Math.random() * Math.PI * 2;
 
-    const bindInput = (id, prop, parseFn = parseFloat) => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.addEventListener('input', (e) => {
-          this[prop] = parseFn(e.target.value);
-          const valEl = document.getElementById(`${id}-val`);
-          if (valEl) valEl.innerText = e.target.value;
+        this.posX[idx] = cx + r * Math.cos(angle);
+        this.posY[idx] = cy + (Math.random() - 0.5) * 15;
+        this.posZ[idx] = cz + r * Math.sin(angle);
+
+        const v = Math.sqrt((this.G * 3500) / r);
+        this.velX[idx] = vx - v * Math.sin(angle);
+        this.velY[idx] = vy;
+        this.velZ[idx] = vz + v * Math.cos(angle);
+        this.mass[idx] = 1.0;
+      }
+    }
+
+    updatePhysics() {
+      if (this.isPaused) return;
+
+      const N = this.particleCount;
+      for (let i = 0; i < N; i++) {
+        this.accX[i] = 0; this.accY[i] = 0; this.accZ[i] = 0;
+      }
+
+      this.tree.build(this.posX, this.posY, this.posZ, this.mass, N);
+
+      for (let i = 0; i < N; i++) {
+        this.tree.calculateForce(
+          this.tree.root, i, this.posX, this.posY, this.posZ,
+          this.accX, this.accY, this.accZ,
+          this.theta, this.G, this.softening
+        );
+      }
+
+      // Touch Attractor Force
+      if (this.touchActive) {
+        for (let i = 0; i < N; i++) {
+          const dx = this.touchPos.x - this.posX[i];
+          const dy = this.touchPos.y - this.posY[i];
+          const dz = this.touchPos.z - this.posZ[i];
+          const distSq = dx * dx + dy * dy + dz * dz + 500;
+          const dist = Math.sqrt(distSq);
+          const f = (this.G * 12000) / distSq;
+          this.accX[i] += (dx / dist) * f;
+          this.accY[i] += (dy / dist) * f;
+          this.accZ[i] += (dz / dist) * f;
+        }
+      }
+
+      // Symplectic Integrator + Tablet Stability Guards
+      const maxV = 100.0;
+      for (let i = 0; i < N; i++) {
+        this.velX[i] += this.accX[i] * this.dt;
+        this.velY[i] += this.accY[i] * this.dt;
+        this.velZ[i] += this.accZ[i] * this.dt;
+
+        // Velocity Clamping to prevent black screen crashes
+        const vSq = this.velX[i]**2 + this.velY[i]**2 + this.velZ[i]**2;
+        if (vSq > maxV * maxV) {
+          const scale = maxV / Math.sqrt(vSq);
+          this.velX[i] *= scale;
+          this.velY[i] *= scale;
+          this.velZ[i] *= scale;
+        }
+
+        this.posX[i] += this.velX[i] * this.dt;
+        this.posY[i] += this.velY[i] * this.dt;
+        this.posZ[i] += this.velZ[i] * this.dt;
+
+        // Bounds Sanitization
+        if (!Number.isFinite(this.posX[i]) || !Number.isFinite(this.posY[i]) || !Number.isFinite(this.posZ[i]) ||
+            Math.abs(this.posX[i]) > 6000 || Math.abs(this.posY[i]) > 6000 || Math.abs(this.posZ[i]) > 6000) {
+          this.posX[i] = (Math.random() - 0.5) * 400;
+          this.posY[i] = (Math.random() - 0.5) * 400;
+          this.posZ[i] = (Math.random() - 0.5) * 400;
+          this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
+        }
+
+        const vx = this.velX[i], vy = this.velY[i], vz = this.velZ[i];
+        this.vMag[i] = Math.sqrt(vx * vx + vy * vy + vz * vz);
+
+        this.flatPosBuffer[i * 3] = this.posX[i];
+        this.flatPosBuffer[i * 3 + 1] = this.posY[i];
+        this.flatPosBuffer[i * 3 + 2] = this.posZ[i];
+      }
+
+      this.geometry.attributes.position.needsUpdate = true;
+      this.geometry.attributes.vMag.needsUpdate = true;
+      this.geometry.setDrawRange(0, N);
+
+      this.updateSpacetimeGrid();
+      this.computeEnergies(false);
+    }
+
+    updateSpacetimeGrid() {
+      if (!this.gridGeo) return;
+      const posAttr = this.gridGeo.attributes.position;
+      const N = this.particleCount;
+
+      for (let i = 0; i < posAttr.count; i++) {
+        const gx = posAttr.getX(i);
+        const gz = posAttr.getZ(i);
+        let dip = 0;
+
+        for (let p = 0; p < Math.min(N, 12); p++) {
+          if (this.mass[p] > 250) {
+            const dx = gx - this.posX[p];
+            const dz = gz - this.posZ[p];
+            const distSq = dx * dx + dz * dz + 8000;
+            dip += (this.mass[p] * 60) / Math.sqrt(distSq);
+          }
+        }
+        posAttr.setY(i, this.gridOriginalY[i] - Math.min(dip, 300));
+      }
+      posAttr.needsUpdate = true;
+    }
+
+    computeEnergies(setInitial = false) {
+      let ek = 0;
+      let ep = 0;
+      const N = this.particleCount;
+
+      for (let i = 0; i < N; i++) {
+        ek += 0.5 * this.mass[i] * (this.velX[i] ** 2 + this.velY[i] ** 2 + this.velZ[i] ** 2);
+      }
+
+      for (let i = 0; i < Math.min(N, 80); i++) {
+        for (let j = i + 1; j < Math.min(N, 80); j++) {
+          const dx = this.posX[j] - this.posX[i];
+          const dy = this.posY[j] - this.posY[i];
+          const dz = this.posZ[j] - this.posZ[i];
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz + this.softening);
+          ep -= (this.G * this.mass[i] * this.mass[j]) / dist;
+        }
+      }
+
+      const et = ek + ep;
+      if (setInitial || this.initialEnergy === 0 || !Number.isFinite(this.initialEnergy)) {
+        this.initialEnergy = et;
+      }
+
+      const drift = Math.abs((et - this.initialEnergy) / (this.initialEnergy || 1)) * 100;
+
+      const elEk = document.getElementById('stat-ek');
+      const elEp = document.getElementById('stat-ep');
+      const elEt = document.getElementById('stat-et');
+      const elDrift = document.getElementById('stat-drift');
+
+      if (elEk) elEk.innerText = ek.toFixed(0);
+      if (elEp) elEp.innerText = ep.toFixed(0);
+      if (elEt) elEt.innerText = et.toFixed(0);
+      if (elDrift) elDrift.innerText = (Number.isFinite(drift) ? drift.toFixed(2) : '0.00') + '%';
+
+      if (this.chart && this.frameCount % 10 === 0) {
+        const datasets = this.chart.data.datasets;
+        datasets[0].data.shift(); datasets[0].data.push(ek);
+        datasets[1].data.shift(); datasets[1].data.push(ep);
+        datasets[2].data.shift(); datasets[2].data.push(et);
+        this.chart.update('none');
+      }
+    }
+
+    initUI() {
+      this.lastTime = performance.now();
+      this.frameCount = 0;
+
+      const pauseBtn = document.getElementById('pauseBtn');
+      if (pauseBtn) {
+        pauseBtn.addEventListener('click', () => {
+          this.isPaused = !this.isPaused;
+          pauseBtn.innerText = this.isPaused ? 'Resume' : 'Pause';
         });
       }
-    };
 
-    bindInput('slider-particles', 'particleCount', parseInt);
-    bindInput('slider-gravity', 'G');
-    bindInput('slider-softening', 'softening');
-    bindInput('slider-dt', 'dt');
-    bindInput('slider-theta', 'theta');
-  }
+      const resetBtn = document.getElementById('resetBtn');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => this.loadPreset('galaxy'));
+      }
 
-  animate() {
-    requestAnimationFrame(() => this.animate());
+      const bindBtn = (id, preset) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', () => this.loadPreset(preset));
+      };
 
-    const t0 = performance.now();
-    this.updatePhysics();
-    const tPhysics = performance.now() - t0;
+      bindBtn('btnGalaxy', 'galaxy');
+      bindBtn('btnSolar', 'solar');
+      bindBtn('btnCloud', 'cloud');
 
-    this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+      const bindInput = (id, prop, parseFn = parseFloat) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', (e) => {
+            this[prop] = parseFn(e.target.value);
+            const valEl = document.getElementById(`${id}-val`);
+            if (valEl) valEl.innerText = e.target.value;
+          });
+        }
+      };
 
-    this.frameCount++;
-    const now = performance.now();
-    if (now - this.lastTime >= 1000) {
-      const fpsEl = document.getElementById('stat-fps');
-      const timeEl = document.getElementById('stat-calc-time');
-      if (fpsEl) fpsEl.innerText = Math.round((this.frameCount * 1000) / (now - this.lastTime));
-      if (timeEl) timeEl.innerText = tPhysics.toFixed(1) + ' ms';
-      this.frameCount = 0;
-      this.lastTime = now;
+      bindInput('slider-particles', 'particleCount', parseInt);
+      bindInput('slider-gravity', 'G');
+      bindInput('slider-softening', 'softening');
+      bindInput('slider-dt', 'dt');
+    }
+
+    animate() {
+      requestAnimationFrame(() => this.animate());
+
+      const t0 = performance.now();
+      this.updatePhysics();
+      const tPhysics = performance.now() - t0;
+
+      this.controls.update();
+      this.renderer.render(this.scene, this.camera);
+
+      this.frameCount++;
+      const now = performance.now();
+      if (now - this.lastTime >= 1000) {
+        const fpsEl = document.getElementById('stat-fps');
+        const timeEl = document.getElementById('stat-calc-time');
+        if (fpsEl) fpsEl.innerText = Math.round((this.frameCount * 1000) / (now - this.lastTime));
+        if (timeEl) timeEl.innerText = tPhysics.toFixed(1) + ' ms';
+        this.frameCount = 0;
+        this.lastTime = now;
+      }
     }
   }
-}
 
-window.addEventListener('DOMContentLoaded', () => {
-  new ChronosSimulation();
-});
+  window.addEventListener('DOMContentLoaded', () => {
+    new ChronosSimulation();
+  });
 </script>
 </body>
 </html>
