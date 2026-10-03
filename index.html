@@ -114,6 +114,9 @@
       this.lastTime = performance.now();
       this.currentPreset = 'galaxy';
 
+      this.totalKinetic = 0;
+      this.totalPotential = 0;
+
       this.initThree();
       this.initGrid();
       this.initTouchControls();
@@ -315,8 +318,8 @@
       const G = this.G;
       const eps2 = this.softening * this.softening;
 
-      let totalKinetic = 0;
-      let totalPotential = 0;
+      this.totalKinetic = 0;
+      this.totalPotential = 0;
 
       for (let i = 0; i < N; i++) {
         this.accX[i] = 0;
@@ -351,7 +354,7 @@
           this.accY[j] -= fy * mi;
           this.accZ[j] -= fz * mi;
 
-          totalPotential -= (G * mi * this.mass[j]) / dist;
+          this.totalPotential -= (G * mi * this.mass[j]) / dist;
         }
 
         if (this.touchActive && this.touchPos) {
@@ -382,7 +385,7 @@
         this.posZ[i] += this.velZ[i] * dt;
 
         const speedSq = this.velX[i] ** 2 + this.velY[i] ** 2 + this.velZ[i] ** 2;
-        totalKinetic += 0.5 * this.mass[i] * speedSq;
+        this.totalKinetic += 0.5 * this.mass[i] * speedSq;
 
         posAttr[i * 3] = this.posX[i];
         posAttr[i * 3 + 1] = this.posY[i];
@@ -390,11 +393,6 @@
       }
 
       this.geometry.attributes.position.needsUpdate = true;
-
-      const kEl = document.getElementById('stat-kinetic');
-      if (kEl) kEl.innerText = Math.round(totalKinetic).toLocaleString();
-      const pEl = document.getElementById('stat-potential');
-      if (pEl) pEl.innerText = Math.round(totalPotential).toLocaleString();
     }
 
     bindControls() {
@@ -432,6 +430,12 @@
         if (fpsEl) fpsEl.innerText = Math.round((this.frameCount * 1000) / (now - this.lastTime)) + ' FPS';
         const calcEl = document.getElementById('stat-calc-time');
         if (calcEl) calcEl.innerText = tCalc.toFixed(1) + ' ms';
+
+        const kEl = document.getElementById('stat-kinetic');
+        if (kEl) kEl.innerText = Math.round(this.totalKinetic).toLocaleString();
+        const pEl = document.getElementById('stat-potential');
+        if (pEl) pEl.innerText = Math.round(this.totalPotential).toLocaleString();
+
         this.frameCount = 0;
         this.lastTime = now;
       }
