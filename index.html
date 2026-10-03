@@ -569,23 +569,26 @@
         totalPotential -= (G * mi * this.mass[j]) / dist;
       }
 
-      // Integration
-      this.velX[i] += this.accX[i] * dt;
-      this.velY[i] += this.accY[i] * dt;
-      this.velZ[i] += this.accZ[i] * dt;
+      // Symplectic Integration for energy conservation
+this.velX[i] += this.accX[i] * dt;
+this.velY[i] += this.accY[i] * dt;
+this.velZ[i] += this.accZ[i] * dt;
 
-      this.posX[i] += this.velX[i] * dt;
-      this.posY[i] += this.velY[i] * dt;
-      this.posZ[i] += this.velZ[i] * dt;
+this.posX[i] += this.velX[i] * dt;
+this.posY[i] += this.velY[i] * dt;
+this.posZ[i] += this.velZ[i] * dt;
+      
+      
 
       const speedSq = this.velX[i] ** 2 + this.velY[i] ** 2 + this.velZ[i] ** 2;
       totalKinetic += 0.5 * mi * speedSq;
 
-      const posAttr = this.geometry.attributes.position.array;
-      posAttr[i * 3] = this.posX[i];
-      posAttr[i * 3 + 1] = this.posY[i];
-      posAttr[i * 3 + 2] = this.posZ[i];
+              const posAttr = this.geometry.attributes.position.array;
+        posAttr[i * 3]     = this.posX[i];
+        posAttr[i * 3 + 1] = this.posY[i];
+        posAttr[i * 3 + 2] = this.posZ[i];
     }
+    
 
     this.geometry.attributes.position.needsUpdate = true;
 
@@ -632,7 +635,7 @@
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  new NBodySim();
+  new NBodySimulator();
 });
 </script>
 </body>
