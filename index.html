@@ -1,930 +1,924 @@
-```html
 <!DOCTYPE html>
-<html lang="en" class="h-full w-full overflow-hidden bg-slate-950">
+<html lang="en" class="dark h-full">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chronos-N: N-Body Barnes-Hut Gravitational & Galaxy Simulator</title>
+  <title>Chronos-N Gravitational Simulator</title>
   
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              900: '#1e3a8a',
+              accent: '#8b5cf6'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Orbitron', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Inter & Orbitron -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
 
-  <!-- Three.js & OrbitControls CDN -->
+  <!-- Three.js (3D Graphics Core) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Three.js OrbitControls -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Chart.js for Live Telemetry -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body {
       font-family: 'Inter', sans-serif;
       user-select: none;
+      overflow: hidden;
+      background-color: #030712;
     }
-    .font-mono {
-      font-family: 'JetBrains Mono', monospace;
-    }
-    /* Custom Scrollbar for Controls Drawer */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.6);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(51, 65, 85, 0.8);
-      border-radius: 3px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(71, 85, 105, 1);
-    }
-    /* Custom Range Inputs */
-    input[type=range] {
-      accent-color: #38bdf8;
-    }
+    .font-display { font-family: 'Orbitron', sans-serif; }
+    
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.4); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.7); }
+
+    /* Glassmorphism Panels */
     .glass-panel {
       background: rgba(15, 23, 42, 0.75);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
+    .glass-panel-subtle {
+      background: rgba(30, 41, 59, 0.5);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Glow utilities */
+    .glow-blue { box-shadow: 0 0 15px rgba(59, 130, 246, 0.35); }
+    .glow-purple { box-shadow: 0 0 15px rgba(139, 92, 246, 0.35); }
+    .text-glow { text-shadow: 0 0 8px rgba(59, 130, 246, 0.6); }
+
+    /* Canvas full size */
+    #sim-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
   </style>
 </head>
-<body class="h-full w-full overflow-hidden text-slate-100 flex flex-col relative">
 
-  <!-- 3D WebGL Canvas Container -->
-  <div id="canvas-container" class="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"></div>
+<body class="h-full text-slate-100 bg-slate-950 flex flex-col antialiased">
 
   <!-- Top Navigation Header -->
-  <header class="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
-    <div class="glass-panel px-4 py-2.5 rounded-xl flex items-center gap-3 pointer-events-auto shadow-2xl">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-cyan-500/30">
-        <i class="fa-solid to-atom fa-atom animate-spin-slow"></i>
+  <header class="h-14 glass-panel z-30 flex items-center justify-between px-4 select-none shrink-0 border-b border-slate-800">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+        <svg class="w-5 h-5 text-white animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 6"/>
+          <circle cx="12" cy="12" r="3" fill="currentColor"/>
+        </svg>
       </div>
       <div>
-        <h1 class="text-base font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-sky-200 to-indigo-300 bg-clip-text text-transparent">
-          CHRONOS-N
+        <h1 class="font-display font-bold text-lg tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">
+          CHRONOS<span class="text-xs font-normal text-blue-400 ml-1 px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-800/50">N-BODY</span>
         </h1>
-        <p class="text-[10px] text-slate-400 font-medium tracking-wide">
-          BARNES-HUT $O(N \log N)$ GRAVITATIONAL SIMULATOR
-        </p>
       </div>
     </div>
 
-    <!-- Quick Actions / Simulation State Badges -->
-    <div class="flex items-center gap-3 pointer-events-auto">
-      <div id="status-toast" class="hidden glass-panel px-3 py-1.5 rounded-lg text-xs font-mono text-cyan-300 flex items-center gap-2 transition-all duration-300">
-        <i class="fa-solid fa-circle-info text-cyan-400"></i>
-        <span id="status-toast-text">Simulation initialized</span>
-      </div>
+    <!-- Quick Simulation Controls Center -->
+    <div class="flex items-center space-x-2 glass-panel-subtle px-3 py-1 rounded-xl">
+      <!-- Play / Pause -->
+      <button id="btn-play-pause" class="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition glow-blue" title="Play/Pause (Space)">
+        <svg id="icon-pause" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"/></svg>
+        <svg id="icon-play" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+      </button>
 
-      <button id="toggle-panel-btn" class="glass-panel hover:bg-slate-800/80 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition shadow-xl">
-        <i class="fa-solid fa-sliders text-cyan-400"></i>
-        <span>Controls</span>
+      <!-- Step Forward -->
+      <button id="btn-step" class="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 transition" title="Step Frame Forward">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+      </button>
+
+      <!-- Reverse Speed / Time direction -->
+      <button id="btn-reverse" class="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 transition" title="Toggle Reverse Time">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </button>
+
+      <!-- Time Step Speed Slider -->
+      <div class="flex items-center space-x-2 border-l border-slate-700 pl-3">
+        <span class="text-xs font-mono text-slate-400">Speed:</span>
+        <input id="slider-speed" type="range" min="0.1" max="10" step="0.1" value="1" class="w-20 accent-blue-500 cursor-pointer">
+        <span id="label-speed" class="text-xs font-mono w-8 text-blue-400">1.0x</span>
+      </div>
+    </div>
+
+    <!-- Right Quick Actions -->
+    <div class="flex items-center space-x-2">
+      <!-- Sound FX Toggle -->
+      <button id="btn-audio" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Toggle Cosmic Sound FX">
+        <svg id="icon-sound-off" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+        <svg id="icon-sound-on" class="w-5 h-5 hidden text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+      </button>
+
+      <!-- Clear Canvas / Reset -->
+      <button id="btn-reset" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-950/60 hover:bg-red-900 border border-red-800/50 text-red-300 transition">
+        Reset System
       </button>
     </div>
   </header>
 
-  <!-- Left Stats Overlay Floating HUD -->
-  <div class="absolute bottom-4 left-4 z-10 pointer-events-none">
-    <div class="glass-panel p-4 rounded-2xl w-64 pointer-events-auto shadow-2xl border border-slate-800/80">
-      <div class="flex items-center justify-between border-b border-slate-800/80 pb-2 mb-3">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-          <i class="fa-solid fa-chart-line text-cyan-400"></i> Performance HUD
-        </span>
-        <span id="fps-badge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-          60 FPS
-        </span>
+  <!-- Main Application Body Workspace -->
+  <div class="relative flex-1 flex overflow-hidden">
+
+    <!-- Collapsible Controls Sidebar Panel -->
+    <aside id="sidebar" class="w-80 glass-panel z-20 flex flex-col border-r border-slate-800 transition-all duration-300 relative shrink-0">
+      
+      <!-- Sidebar Tab Navigation -->
+      <div class="flex border-b border-slate-800 text-xs font-medium">
+        <button data-tab="presets" class="tab-btn flex-1 py-3 text-center text-blue-400 border-b-2 border-blue-500 bg-slate-800/40 font-semibold">Presets</button>
+        <button data-tab="physics" class="tab-btn flex-1 py-3 text-center text-slate-400 hover:text-slate-200">Physics</button>
+        <button data-tab="spawner" class="tab-btn flex-1 py-3 text-center text-slate-400 hover:text-slate-200">Spawner</button>
+        <button data-tab="analytics" class="tab-btn flex-1 py-3 text-center text-slate-400 hover:text-slate-200">Analytics</button>
       </div>
 
-      <div class="space-y-2.5 font-mono text-xs">
-        <div class="flex justify-between items-center">
-          <span class="text-slate-400 text-[11px]">Particles (N):</span>
-          <span id="stat-particles" class="text-cyan-300 font-bold">10,000</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-slate-400 text-[11px]">Octree Nodes:</span>
-          <span id="stat-nodes" class="text-indigo-300 font-bold">4,210</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-slate-400 text-[11px]">Physics Frame:</span>
-          <span id="stat-physics-time" class="text-amber-300 font-bold">4.2 ms</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-slate-400 text-[11px]">Render Frame:</span>
-          <span id="stat-render-time" class="text-sky-300 font-bold">2.1 ms</span>
-        </div>
-      </div>
+      <!-- Tab Contents Container -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-5">
+        
+        <!-- Tab 1: Presets -->
+        <div id="tab-presets" class="tab-content space-y-3">
+          <h2 class="text-xs font-display font-semibold text-slate-400 uppercase tracking-wider">Gravitational Scenarios</h2>
+          
+          <div class="grid grid-cols-1 gap-2">
+            <button data-scenario="solarSystem" class="scenario-btn glass-panel-subtle p-3 rounded-xl text-left hover:border-blue-500/50 hover:bg-slate-800/60 transition group">
+              <div class="font-semibold text-sm text-slate-100 group-hover:text-blue-400">☀️ Solar System Core</div>
+              <div class="text-xs text-slate-400 mt-1">Central star with terrestrial & gas giant planets on elliptical Keplerian orbits.</div>
+            </button>
 
-      <!-- Mouse Gravity Mode Indicator -->
-      <div class="mt-3.5 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-        <span class="text-slate-400">Mouse Attractor:</span>
-        <span id="mouse-mode-badge" class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-slate-400 border border-slate-700">
-          [HOLD LEFT CLICK]
-        </span>
+            <button data-scenario="galaxyCollision" class="scenario-btn glass-panel-subtle p-3 rounded-xl text-left hover:border-purple-500/50 hover:bg-slate-800/60 transition group">
+              <div class="font-semibold text-sm text-slate-100 group-hover:text-purple-400">🌌 Galactic Merger (1,200 Stars)</div>
+              <div class="text-xs text-slate-400 mt-1">Two disk galaxies colliding using fast $O(N \log N)$ Barnes-Hut octree calculation.</div>
+            </button>
+
+            <button data-scenario="threeBody" class="scenario-btn glass-panel-subtle p-3 rounded-xl text-left hover:border-indigo-500/50 hover:bg-slate-800/60 transition group">
+              <div class="font-semibold text-sm text-slate-100 group-hover:text-indigo-400">♾️ Figure-8 Three-Body</div>
+              <div class="text-xs text-slate-400 mt-1">Chenciner stable choreography with 3 identical masses tracing an 8-figure path.</div>
+            </button>
+
+            <button data-scenario="lagrangePoints" class="scenario-btn glass-panel-subtle p-3 rounded-xl text-left hover:border-emerald-500/50 hover:bg-slate-800/60 transition group">
+              <div class="font-semibold text-sm text-slate-100 group-hover:text-emerald-400">🛰️ Lagrange Points $L_1 - L_5$</div>
+              <div class="text-xs text-slate-400 mt-1">Earth-Moon binary with dust clouds demonstrating gravitational equilibrium dynamics.</div>
+            </button>
+
+            <button data-scenario="blackHoleAccretion" class="scenario-btn glass-panel-subtle p-3 rounded-xl text-left hover:border-amber-500/50 hover:bg-slate-800/60 transition group">
+              <div class="font-semibold text-sm text-slate-100 group-hover:text-amber-400">🕳️ Relativistic Black Hole</div>
+              <div class="text-xs text-slate-400 mt-1">Schwarzschild horizon, accretion disk accretion, and orbital perihelion precession.</div>
+            </button>
+
+            <button data-scenario="globularCluster" class="scenario-btn glass-panel-subtle p-3 rounded-xl text-left hover:border-cyan-500/50 hover:bg-slate-800/60 transition group">
+              <div class="font-semibold text-sm text-slate-100 group-hover:text-cyan-400">✨ Globular Star Cluster</div>
+              <div class="text-xs text-slate-400 mt-1">Plummer sphere density profile undergoing core collapse and ejection.</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 2: Physics Controls -->
+        <div id="tab-physics" class="tab-content hidden space-y-4">
+          <h2 class="text-xs font-display font-semibold text-slate-400 uppercase tracking-wider">Engine & Relativity</h2>
+
+          <!-- Integrator Selector -->
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-slate-300">Numerical Integrator</label>
+            <select id="select-integrator" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+              <option value="verlet">Symplectic Velocity Verlet (Stable Energy)</option>
+              <option value="rk4">Runge-Kutta 4th Order (RK4 High Precision)</option>
+              <option value="euler">Euler (Fast / Explosive)</option>
+            </select>
+          </div>
+
+          <!-- Gravitational Constant G -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-slate-300">Gravitational Constant ($G$)</span>
+              <span id="val-g" class="font-mono text-blue-400">1.00</span>
+            </div>
+            <input id="slider-g" type="range" min="0.1" max="5.0" step="0.05" value="1.0" class="w-full accent-blue-500">
+          </div>
+
+          <!-- Softening Factor epsilon -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-slate-300">Plummer Softening ($\epsilon$)</span>
+              <span id="val-softening" class="font-mono text-blue-400">0.15</span>
+            </div>
+            <input id="slider-softening" type="range" min="0.01" max="2.0" step="0.02" value="0.15" class="w-full accent-blue-500">
+            <p class="text-[10px] text-slate-500">Prevents infinite gravitational accelerations during close flybys.</p>
+          </div>
+
+          <!-- Collisions Toggle -->
+          <div class="space-y-2 pt-2 border-t border-slate-800">
+            <label class="text-xs font-medium text-slate-300">Collision Physics</label>
+            <select id="select-collision" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+              <option value="merge">Inelastic Merge (Conserve Momentum & Volume)</option>
+              <option value="elastic">Elastic Bounce</option>
+              <option value="none">Ghost Pass-Through (N-body ideal point mass)</option>
+            </select>
+          </div>
+
+          <!-- General Relativity Precession -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+            <div>
+              <div class="text-xs font-medium text-slate-200">General Relativity Precession</div>
+              <div class="text-[10px] text-slate-400">Adds $1 + 3v^2/c^2$ post-Newtonian force correction</div>
+            </div>
+            <input id="toggle-relativity" type="checkbox" class="w-4 h-4 rounded accent-purple-500 cursor-pointer">
+          </div>
+
+          <!-- Barnes-Hut Octree Toggle -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+            <div>
+              <div class="text-xs font-medium text-slate-200">Barnes-Hut Octree ($O(N \log N)$)</div>
+              <div class="text-[10px] text-slate-400">Accelerates large body counts ($N > 200$)</div>
+            </div>
+            <input id="toggle-barnes-hut" type="checkbox" checked class="w-4 h-4 rounded accent-blue-500 cursor-pointer">
+          </div>
+
+          <!-- Visual Overlays Toggles -->
+          <div class="space-y-2 pt-2 border-t border-slate-800">
+            <label class="text-xs font-medium text-slate-300">Visual Overlays</label>
+            
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Spacetime Potential Grid Warp</span>
+              <input id="toggle-grid" type="checkbox" checked class="accent-blue-500">
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Velocity Vector Arrows</span>
+              <input id="toggle-vectors" type="checkbox" class="accent-blue-500">
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Orbital Particle Trails</span>
+              <input id="toggle-trails" type="checkbox" checked class="accent-blue-500">
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Body Labels & Distance</span>
+              <input id="toggle-labels" type="checkbox" checked class="accent-blue-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Spawner / Creator -->
+        <div id="tab-spawner" class="tab-content hidden space-y-4">
+          <h2 class="text-xs font-display font-semibold text-slate-400 uppercase tracking-wider">Interactive Body Generator</h2>
+          
+          <div class="p-3 glass-panel-subtle rounded-xl space-y-3">
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-slate-300">Preset Class</label>
+              <select id="spawn-type" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200">
+                <option value="star">Glowing Star (Mass: 1000)</option>
+                <option value="planet">Terrestrial Planet (Mass: 10)</option>
+                <option value="gasGiant">Gas Giant Planet (Mass: 50)</option>
+                <option value="blackHole">Supermassive Black Hole (Mass: 5000)</option>
+                <option value="custom">Custom Particle</option>
+              </select>
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-300">Mass</span>
+                <span id="val-spawn-mass" class="font-mono text-blue-400">100</span>
+              </div>
+              <input id="slider-spawn-mass" type="range" min="1" max="5000" step="5" value="100" class="w-full accent-blue-500">
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-300">Body Color</span>
+                <input id="spawn-color" type="color" value="#3b82f6" class="w-6 h-6 rounded bg-transparent cursor-pointer border-0">
+              </div>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-blue-950/40 border border-blue-800/40 text-[11px] text-blue-300">
+              💡 <strong>Interaction Guide:</strong> Click anywhere on the 3D space and drag to draw a initial velocity vector arrow. Release mouse to launch the body!
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Analytics -->
+        <div id="tab-analytics" class="tab-content hidden space-y-4">
+          <h2 class="text-xs font-display font-semibold text-slate-400 uppercase tracking-wider">Live System Energy Telemetry</h2>
+
+          <div class="p-3 glass-panel-subtle rounded-xl space-y-2">
+            <div class="flex justify-between text-xs">
+              <span class="text-slate-400">Active Bodies ($N$):</span>
+              <span id="stat-n" class="font-mono font-bold text-blue-400">0</span>
+            </div>
+            <div class="flex justify-between text-xs">
+              <span class="text-slate-400">Kinetic Energy ($E_k$):</span>
+              <span id="stat-ek" class="font-mono text-emerald-400">0.00</span>
+            </div>
+            <div class="flex justify-between text-xs">
+              <span class="text-slate-400">Potential Energy ($E_p$):</span>
+              <span id="stat-ep" class="font-mono text-purple-400">0.00</span>
+            </div>
+            <div class="flex justify-between text-xs border-t border-slate-700/50 pt-1">
+              <span class="text-slate-300 font-semibold">Total Energy ($E_t$):</span>
+              <span id="stat-et" class="font-mono font-bold text-amber-400">0.00</span>
+            </div>
+            <div class="flex justify-between text-xs">
+              <span class="text-slate-400">Energy Drift ($\Delta E/E_0$):</span>
+              <span id="stat-drift" class="font-mono text-xs text-blue-300">0.00%</span>
+            </div>
+          </div>
+
+          <!-- Real-Time Chart Canvas -->
+          <div class="glass-panel-subtle p-2 rounded-xl h-44 relative">
+            <can            <canvas id="energyChart"></canvas>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Right Floating Control Drawer -->
-  <aside id="controls-panel" class="absolute top-20 right-4 bottom-4 w-80 z-20 glass-panel rounded-2xl flex flex-col shadow-2xl overflow-hidden transition-all duration-300 transform translate-x-0 border border-slate-800/90">
-    <!-- Panel Header -->
-    <div class="p-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/40">
-      <div class="flex items-center gap-2">
-        <i class="fa-solid fa-microchip text-cyan-400 text-sm"></i>
-        <h2 class="text-sm font-bold text-slate-100">Parameters & Presets</h2>
-      </div>
-      <button id="close-panel-btn" class="text-slate-400 hover:text-white transition p-1 text-sm">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-    </div>
-
-    <!-- Scrollable Controls Body -->
-    <div class="flex-1 overflow-y-auto p-4 space-y-5">
-
-      <!-- Presets Selector -->
-      <div>
-        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-          Cosmic Scenario Presets
-        </label>
-        <div class="grid grid-cols-1 gap-2">
-          <button data-preset="collision" class="preset-btn p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-left transition flex items-center gap-3 active-preset">
-            <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
-              <i class="fa-solid fa-arrows-to-circle text-sm"></i>
-            </div>
-            <div>
-              <div class="text-xs font-bold text-slate-200">Galactic Collision</div>
-              <div class="text-[10px] text-slate-400">Two colliding spiral galaxies</div>
-            </div>
-          </button>
-
-          <button data-preset="accretion" class="preset-btn p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-left transition flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
-              <i class="fa-solid fa-sun text-sm"></i>
-            </div>
-            <div>
-              <div class="text-xs font-bold text-slate-200">Accretion Disk</div>
-              <div class="text-[10px] text-slate-400">Massive central attractor disk</div>
-            </div>
-          </button>
-
-          <button data-preset="collapse" class="preset-btn p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-left transition flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
-              <i class="fa-solid fa-compress text-sm"></i>
-            </div>
-            <div>
-              <div class="text-xs font-bold text-slate-200">Protostellar Collapse</div>
-              <div class="text-[10px] text-slate-400">Uniform cloud self-gravity collapse</div>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      <!-- Playback Actions -->
-      <div class="pt-2 border-t border-slate-800/80">
-        <div class="grid grid-cols-3 gap-2">
-          <button id="btn-play-pause" class="py-2.5 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-lg shadow-cyan-500/20">
-            <i class="fa-solid fa-pause" id="play-icon"></i>
-            <span id="play-text">Pause</span>
-          </button>
-          <button id="btn-step" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition">
-            <i class="fa-solid fa-forward-step"></i>
-            <span>Step</span>
-          </button>
-          <button id="btn-reset" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition">
-            <i class="fa-solid fa-rotate-left"></i>
-            <span>Reset</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Barnes-Hut & Physics Sliders -->
-      <div class="space-y-4 pt-2 border-t border-slate-800/80">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
-          Physics Engine Parameters
-        </span>
-
-        <!-- Particle Count -->
-        <div>
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-300">Particles (N):</span>
-            <span id="val-particles" class="font-mono text-cyan-400 font-bold">10,000</span>
-          </div>
-          <input id="slider-particles" type="range" min="1000" max="20000" step="1000" value="10000" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-        </div>
-
-        <!-- Theta (Multipole Criterion) -->
-        <div>
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-300 flex items-center gap-1">
-              Theta ($\theta$ Accuracy):
-            </span>
-            <span id="val-theta" class="font-mono text-cyan-400 font-bold">0.50</span>
-          </div>
-          <input id="slider-theta" type="range" min="0.1" max="1.5" step="0.05" value="0.50" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-          <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
-            <span>0.1 (Exact $O(N^2)$)</span>
-            <span>1.5 (Fast Fast)</span>
-          </div>
-        </div>
-
-        <!-- Gravitational Constant G -->
-        <div>
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-300">Gravity Constant ($G$):</span>
-            <span id="val-g" class="font-mono text-cyan-400 font-bold">1.50</span>
-          </div>
-          <input id="slider-g" type="range" min="0.1" max="5.0" step="0.1" value="1.50" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-        </div>
-
-        <!-- Time Step dt -->
-        <div>
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-300">Time Step ($\Delta t$):</span>
-            <span id="val-dt" class="font-mono text-cyan-400 font-bold">0.012</span>
-          </div>
-          <input id="slider-dt" type="range" min="0.001" max="0.040" step="0.001" value="0.012" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-        </div>
-
-        <!-- Softening Factor epsilon -->
-        <div>
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-300">Plummer Softening ($\epsilon$):</span>
-            <span id="val-softening" class="font-mono text-cyan-400 font-bold">12.0</span>
-          </div>
-          <input id="slider-softening" type="range" min="1.0" max="40.0" step="1.0" value="12.0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-        </div>
-      </div>
-
-      <!-- Visualization Options -->
-      <div class="space-y-3 pt-2 border-t border-slate-800/80">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
-          Visual Style & GLSL
-        </span>
-
-        <!-- Particle Size -->
-        <div>
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-300">Point Scale:</span>
-            <span id="val-point-size" class="font-mono text-cyan-400 font-bold">16.0</span>
-          </div>
-          <input id="slider-point-size" type="range" min="4.0" max="40.0" step="1.0" value="16.0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-        </div>
-
-        <!-- Velocity Heatmap Threshold -->
-        <div>
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-300">Heatmap Max Velocity:</span>
-            <span id="val-max-vel" class="font-mono text-cyan-400 font-bold">35.0</span>
-          </div>
-          <input id="slider-max-vel" type="range" min="5.0" max="100.0" step="1.0" value="35.0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-        </div>
-
-        <!-- Octree Wireframe Toggle -->
-        <div class="flex items-center justify-between pt-1">
-          <span class="text-xs text-slate-300">Render Octree Bounds:</span>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="toggle-octree-wire" class="sr-only peer">
-            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
-          </label>
-        </div>
-      </div>
-
-      <!-- Camera Controls -->
-      <div class="pt-2 border-t border-slate-800/80 pb-2">
-        <button id="btn-reset-cam" class="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 border border-slate-700/80 transition">
-          <i class="fa-solid fa-camera-rotate"></i>
-          <span>Reset Camera View</span>
-        </button>
-      </div>
-
-    </div>
-  </aside>
-
   <script>
-
-    /**
-     * Reusable Octree Node Structure for Barnes-Hut.
-     * Memory Pooling is critical to avoid JS garbage collection frame drops.
-     */
+    // --- 3D BARNES-HUT OCTREE ENGINE ---
     class OctreeNode {
-      constructor() {
-        this.cx = 0;
-        this.cy = 0;
-        this.cz = 0;
-        this.halfSize = 0;
-        
-        this.mass = 0;
-        this.comX = 0;
-        this.comY = 0;
-        this.comZ = 0;
-        
+      constructor(cx, cy, cz, halfWidth) {
+        this.cx = cx; this.cy = cy; this.cz = cz;
+        this.halfWidth = halfWidth;
+        this.totalMass = 0;
+        this.comX = 0; this.comY = 0; this.comZ = 0;
+        this.particleIdx = -1;
         this.particleCount = 0;
-        this.particleIdx = -1; // Index of particle if leaf node
-        this.children = [null, null, null, null, null, null, null, null];
-        this.isLeaf = true;
+        this.children = new Array(8).fill(null);
       }
 
-      reset() {
-        this.cx = 0; this.cy = 0; this.cz = 0;
-        this.halfSize = 0;
-        this.mass = 0;
+      reset(cx, cy, cz, halfWidth) {
+        this.cx = cx; this.cy = cy; this.cz = cz;
+        this.halfWidth = halfWidth;
+        this.totalMass = 0;
         this.comX = 0; this.comY = 0; this.comZ = 0;
-        this.particleCount = 0;
         this.particleIdx = -1;
-        this.isLeaf = true;
-        for (let i = 0; i < 8; i++) {
-          this.children[i] = null;
-        }
+        this.particleCount = 0;
+        for (let i = 0; i < 8; i++) this.children[i] = null;
       }
     }
 
-    /**
-     * Memory Pool manager for pre-allocated OctreeNodes.
-     */
     class OctreePool {
-      constructor(capacity = 100000) {
-        this.pool = new Array(capacity);
-        for (let i = 0; i < capacity; i++) {
-          this.pool[i] = new OctreeNode();
-        }
+      constructor(size) {
+        this.pool = Array.from({ length: size }, () => new OctreeNode(0, 0, 0, 0));
         this.index = 0;
       }
 
-      get() {
+      getNode(cx, cy, cz, halfWidth) {
         if (this.index >= this.pool.length) {
-          // Expand pool if capacity exceeded
-          this.pool.push(new OctreeNode());
+          this.pool.push(new OctreeNode(cx, cy, cz, halfWidth));
         }
         const node = this.pool[this.index++];
-        node.reset();
+        node.reset(cx, cy, cz, halfWidth);
         return node;
       }
 
-      reset() {
+      clear() {
         this.index = 0;
       }
     }
 
-
     class BarnesHutTree {
-      constructor(maxParticles = 30000) {
-        this.pool = new OctreePool(maxParticles * 6);
+      constructor(maxNodes) {
+        this.pool = new OctreePool(maxNodes);
         this.root = null;
-        this.activeNodes = 0;
+        this.nodesUsed = 0;
       }
 
-      /**
-       * Builds the octree over the current particle positions.
-       */
-      build(posX, posY, posZ, mass, count) {
-        this.pool.reset();
-        
-        if (count === 0) return;
+      clear() {
+        this.pool.clear();
+        this.root = null;
+        this.nodesUsed = 0;
+      }
 
-        // 1. Calculate bounding box of all active particles
+      build(posX, posY, posZ, mass, N) {
+        this.clear();
+        if (N === 0) return;
+
         let minX = posX[0], maxX = posX[0];
         let minY = posY[0], maxY = posY[0];
         let minZ = posZ[0], maxZ = posZ[0];
 
-        for (let i = 1; i < count; i++) {
-          const x = posX[i], y = posY[i], z = posZ[i];
-          if (x < minX) minX = x; if (x > maxX) maxX = x;
-          if (y < minY) minY = y; if (y > maxY) maxY = y;
-          if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        for (let i = 1; i < N; i++) {
+          if (posX[i] < minX) minX = posX[i];
+          if (posX[i] > maxX) maxX = posX[i];
+          if (posY[i] < minY) minY = posY[i];
+          if (posY[i] > maxY) maxY = posY[i];
+          if (posZ[i] < minZ) minZ = posZ[i];
+          if (posZ[i] > maxZ) maxZ = posZ[i];
         }
 
-        // Make spatial domain cubic
-        const cx = (minX + maxX) * 0.5;
-        const cy = (minY + maxY) * 0.5;
-        const cz = (minZ + maxZ) * 0.5;
-        
-        let size = Math.max(maxX - minX, maxY - minY, maxZ - minZ) * 0.5;
-        size = Math.max(size, 10.0); // Minimum domain size boundary
+        const maxSpan = Math.max(maxX - minX, maxY - minY, maxZ - minZ, 100);
+        const halfWidth = (maxSpan / 2) * 1.1;
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+        const cz = (minZ + maxZ) / 2;
 
-        this.root = this.pool.get();
-        this.root.cx = cx;
-        this.root.cy = cy;
-        this.root.cz = cz;
-        this.root.halfSize = size;
+        this.root = this.pool.getNode(cx, cy, cz, halfWidth);
 
-        // 2. Insert all particles into Octree
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < N; i++) {
           this.insert(this.root, i, posX, posY, posZ, mass, 0);
         }
 
-        // 3. Compute Mass and Center of Mass for all nodes
         this.computeMassDistribution(this.root, posX, posY, posZ, mass);
-
-        this.activeNodes = this.pool.index;
+        this.nodesUsed = this.pool.index;
       }
 
       insert(node, pIdx, posX, posY, posZ, mass, depth) {
-        // Prevent recursion limit overflow for identical coordinates
-        if (depth > 22) return;
-
-        const px = posX[pIdx], py = posY[pIdx], pz = posZ[pIdx];
+        if (depth > 20) return;
 
         if (node.particleCount === 0) {
-          // Empty leaf node: store particle
           node.particleIdx = pIdx;
           node.particleCount = 1;
           return;
         }
 
-        if (node.isLeaf && node.particleCount === 1) {
-          // Subdivide leaf node containing single particle into 8 children
-          node.isLeaf = false;
+        if (node.particleCount === 1) {
           const existingIdx = node.particleIdx;
           node.particleIdx = -1;
-
-          // Re-insert existing particle
-          this.insertIntoSubchild(node, existingIdx, posX, posY, posZ, mass, depth);
-          // Insert new particle
-          this.insertIntoSubchild(node, pIdx, posX, posY, posZ, mass, depth);
+          this.insertChild(node, existingIdx, posX, posY, posZ, mass, depth);
+          this.insertChild(node, pIdx, posX, posY, posZ, mass, depth);
           node.particleCount = 2;
         } else {
-          // Internal node: insert into correct child
-          this.insertIntoSubchild(node, pIdx, posX, posY, posZ, mass, depth);
+          this.insertChild(node, pIdx, posX, posY, posZ, mass, depth);
           node.particleCount++;
         }
       }
 
-        insertIntoSubchild(node, pIdx, posX, posY, posZ, mass, depth) {
-    const px = posX[pIdx], py = posY[pIdx], pz = posZ[pIdx];
+      insertChild(node, pIdx, posX, posY, posZ, mass, depth) {
+        const px = posX[pIdx], py = posY[pIdx], pz = posZ[pIdx];
+        let octant = 0;
+        if (px >= node.cx) octant |= 1;
+        if (py >= node.cy) octant |= 2;
+        if (pz >= node.cz) octant |= 4;
 
-    // Determine octant index (0..7)
-    let octant = 0;
-    if (px >= node.cx) octant |= 1;
-    if (py >= node.cy) octant |= 2;
-    if (pz >= node.cz) octant |= 4;
-
-    if (!node.children[octant]) {
-      const half = node.halfWidth * 0.5;
-      const cx = node.cx + ((octant & 1) ? half : -half);
-      const cy = node.cy + ((octant & 2) ? half : -half);
-      const cz = node.cz + ((octant & 4) ? half : -half);
-      node.children[octant] = this.getNode(cx, cy, cz, half);
-    }
-
-    this.insert(node.children[octant], pIdx, posX, posY, posZ, mass, depth + 1);
-  }
-
-  // Compute mass and center of mass recursively
-  computeMassDistribution(node, posX, posY, posZ, mass) {
-    if (!node) return;
-
-    if (node.particleCount === 1) {
-      const pIdx = node.particleIdx;
-      node.totalMass = mass[pIdx];
-      node.comX = posX[pIdx];
-      node.comY = posY[pIdx];
-      node.comZ = posZ[pIdx];
-      return;
-    }
-
-    let totalM = 0;
-    let comX = 0, comY = 0, comZ = 0;
-
-    for (let i = 0; i < 8; i++) {
-      const child = node.children[i];
-      if (child) {
-        this.computeMassDistribution(child, posX, posY, posZ, mass);
-        totalM += child.totalMass;
-        comX += child.comX * child.totalMass;
-        comY += child.comY * child.totalMass;
-        comZ += child.comZ * child.totalMass;
-      }
-    }
-
-    if (totalM > 0) {
-      node.totalMass = totalM;
-      node.comX = comX / totalM;
-      node.comY = comY / totalM;
-      node.comZ = comZ / totalM;
-    }
-  }
-
-  // Calculate gravitational acceleration on particle pIdx
-  calculateForce(node, pIdx, posX, posY, posZ, accX, accY, accZ, theta, G, softening) {
-    if (!node || node.totalMass === 0) return;
-
-    const px = posX[pIdx];
-    const py = posY[pIdx];
-    const pz = posZ[pIdx];
-
-    const dx = node.comX - px;
-    const dy = node.comY - py;
-    const dz = node.comZ - pz;
-
-    const distSq = dx * dx + dy * dy + dz * dz + softening;
-    const dist = Math.sqrt(distSq);
-
-    // If leaf with 1 particle (itself), ignore
-    if (node.particleCount === 1 && node.particleIdx === pIdx) {
-      return;
-    }
-
-    // Barnes-Hut criterion: (size / distance) < theta or leaf node
-    if ((node.halfWidth * 2) / dist < theta || node.particleCount === 1) {
-      const force = (G * node.totalMass) / (distSq * dist);
-      accX[pIdx] += dx * force;
-      accY[pIdx] += dy * force;
-      accZ[pIdx] += dz * force;
-    } else {
-      // Internal node, recurse into children
-      for (let i = 0; i < 8; i++) {
-        if (node.children[i]) {
-          this.calculateForce(node.children[i], pIdx, posX, posY, posZ, accX, accY, accZ, theta, G, softening);
+        if (!node.children[octant]) {
+          const half = node.halfWidth * 0.5;
+          const cx = node.cx + ((octant & 1) ? half : -half);
+          const cy = node.cy + ((octant & 2) ? half : -half);
+          const cz = node.cz + ((octant & 4) ? half : -half);
+          node.children[octant] = this.pool.getNode(cx, cy, cz, half);
         }
+
+        this.insert(node.children[octant], pIdx, posX, posY, posZ, mass, depth + 1);
       }
-    }
-  }
 
-  // Visual debugging helper: draw octree wireframes
-  renderWireframes(node, linePositions, lineIndex) {
-    if (!node) return lineIndex;
+      computeMassDistribution(node, posX, posY, posZ, mass) {
+        if (!node) return;
 
-    // Draw bounding box if node has particles
-    if (node.particleCount > 0) {
-      const hw = node.halfWidth;
-      const cx = node.cx, cy = node.cy, cz = node.cz;
+        if (node.particleCount === 1) {
+          const idx = node.particleIdx;
+          node.totalMass = mass[idx];
+          node.comX = posX[idx];
+          node.comY = posY[idx];
+          node.comZ = posZ[idx];
+          return;
+        }
 
-      // 12 edges of box
-      const corners = [
-        [cx - hw, cy - hw, cz - hw], [cx + hw, cy - hw, cz - hw],
-        [cx + hw, cy + hw, cz - hw], [cx - hw, cy + hw, cz - hw],
-        [cx - hw, cy - hw, cz + hw], [cx + hw, cy - hw, cz + hw],
-        [cx + hw, cy + hw, cz + hw], [cx - hw, cy + hw, cz + hw]
-      ];
+        let totalM = 0;
+        let comX = 0, comY = 0, comZ = 0;
 
-      const edges = [
-        [0,1],[1,2],[2,3],[3,0],
-        [4,5],[5,6],[6,7],[7,4],
-        [0,4],[1,5],[2,6],[3,7]
-      ];
+        for (let i = 0; i < 8; i++) {
+          const child = node.children[i];
+          if (child) {
+            this.computeMassDistribution(child, posX, posY, posZ, mass);
+            totalM += child.totalMass;
+            comX += child.comX * child.totalMass;
+            comY += child.comY * child.totalMass;
+            comZ += child.comZ * child.totalMass;
+          }
+        }
 
-      for (let e = 0; e < edges.length; e++) {
-        if (lineIndex + 6 <= linePositions.length) {
-          const p1 = corners[edges[e][0]];
-          const p2 = corners[edges[e][1]];
-          linePositions[lineIndex++] = p1[0];
-          linePositions[lineIndex++] = p1[1];
-          linePositions[lineIndex++] = p1[2];
-          linePositions[lineIndex++] = p2[0];
-          linePositions[lineIndex++] = p2[1];
-          linePositions[lineIndex++] = p2[2];
+        if (totalM > 0) {
+          node.totalMass = totalM;
+          node.comX = comX / totalM;
+          node.comY = comY / totalM;
+          node.comZ = comZ / totalM;
         }
       }
 
-      for (let i = 0; i < 8; i++) {
-        if (node.children[i]) {
-          lineIndex = this.renderWireframes(node.children[i], linePositions, lineIndex);
-        }
-      }
-    }
-    return lineIndex;
-  }
-}
+      calculateForce(node, pIdx, posX, posY, posZ, accX, accY, accZ, theta, G, softening, enableRelativity) {
+        if (!node || node.totalMass === 0) return;
 
-// --- MAIN SIMULATION CONTROLLER ---
-class Simulation {
-  constructor() {
-    this.particleCount = 15000;
-    this.maxParticles = 50000;
-    this.theta = 0.5;
-    this.G = 0.8;
-    this.softening = 100;
-    this.dt = 0.5;
-    this.activePreset = 'galaxy';
-    this.showOctree = false;
+        const px = posX[pIdx], py = posY[pIdx], pz = posZ[pIdx];
+        const dx = node.comX - px;
+        const dy = node.comY - py;
+        const dz = node.comZ - pz;
 
-    // Position, Velocity, Acceleration, Mass arrays
-    this.posX = new Float32Array(this.maxParticles);
-    this.posY = new Float32Array(this.maxParticles);
-    this.posZ = new Float32Array(this.maxParticles);
-    this.velX = new Float32Array(this.maxParticles);
-    this.velY = new Float32Array(this.maxParticles);
-    this.velZ = new Float32Array(this.maxParticles);
-    this.accX = new Float32Array(this.maxParticles);
-    this.accY = new Float32Array(this.maxParticles);
-    this.accZ = new Float32Array(this.maxParticles);
-    this.mass = new Float32Array(this.maxParticles);
-    this.vMag = new Float32Array(this.maxParticles);
-
-    this.octree = new BarnesHutOctree(this.maxParticles * 8);
-
-    this.initThreeJS();
-    this.initShaders();
-    this.initParticles();
-    this.initOctreeLines();
-    this.initInteraction();
-    this.initUI();
-    this.animate();
-  }
-
-  initThreeJS() {
-    this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 50000);
-    this.camera.position.set(0, 1500, 2500);
-
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    document.body.appendChild(this.renderer.domElement);
-
-    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
-
-    window.addEventListener('resize', () => {
-      this.camera.aspect = window.innerWidth / window.innerHeight;
-      this.camera.updateProjectionMatrix();
-      this.renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-  }
-
-  initShaders() {
-    this.geometry = new THREE.BufferGeometry();
-    this.posAttribute = new THREE.BufferAttribute(this.posX, 3);
-    this.vMagAttribute = new THREE.BufferAttribute(this.vMag, 1);
-
-    this.geometry.setAttribute('position', this.posAttribute);
-    this.geometry.setAttribute('vMag', this.vMagAttribute);
-
-    this.material = new THREE.ShaderMaterial({
-      vertexShader: `
-        attribute float vMag;
-        varying float vVelocity;
-        void main() {
-          vVelocity = vMag;
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = clamp(300.0 / -mvPosition.z, 1.5, 8.0);
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        varying float vVelocity;
-        void main() {
-          float d = length(gl_PointCoord - vec2(0.5));
-          if (d > 0.5) discard;
-          float alpha = smoothstep(0.5, 0.0, d);
-
-          float normV = clamp(vVelocity / 12.0, 0.0, 1.0);
-          vec3 colorLow = vec3(0.1, 0.3, 0.9);   // Deep Blue
-          vec3 colorMid = vec3(0.9, 0.2, 0.6);   // Magenta/Purple
-          vec3 colorHigh = vec3(1.0, 0.9, 0.4);  // Glowing Gold/White
-
-          vec3 color = mix(colorLow, colorMid, smoothstep(0.0, 0.5, normV));
-          color = mix(color, colorHigh, smoothstep(0.5, 1.0, normV));
-
-          gl_FragColor = vec4(color, alpha * 0.85);
-        }
-      `,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-
-    this.particleSystem = new THREE.Points(this.geometry, this.material);
-    this.scene.add(this.particleSystem);
-  }
-
-  initOctreeLines() {
-    const maxLines = 10000 * 12 * 2 * 3;
-    this.linePositions = new Float32Array(maxLines);
-    this.lineGeometry = new THREE.BufferGeometry();
-    this.lineGeometry.setAttribute('position', new THREE.BufferAttribute(this.linePositions, 3));
-    
-    this.lineMaterial = new THREE.LineBasicMaterial({
-      color: 0x00ffcc,
-      transparent: true,
-      opacity: 0.15
-    });
-
-    this.lineSegments = new THREE.LineSegments(this.lineGeometry, this.lineMaterial);
-    this.lineSegments.visible = false;
-    this.scene.add(this.lineSegments);
-  }
-
-  initParticles() {
-    this.loadPreset(this.activePreset);
-  }
-
-  loadPreset(type) {
-    this.activePreset = type;
-    const N = this.particleCount;
-
-    for (let i = 0; i < this.maxParticles; i++) {
-      this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
-      this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
-      this.mass[i] = 1.0;
-    }
-
-    if (type === 'galaxy') {
-      const half = Math.floor(N / 2);
-      this.generateDiscGalaxy(0, -600, 0, 0, 30, 2, -15, half, 800);
-      this.generateDiscGalaxy(half, 600, 0, 0, -30, -2, 15, N - half, 800);
-    } else if (type === 'accretion') {
-      this.mass[0] = 5000;
-      this.posX[0] = 0; this.posY[0] = 0; this.posZ[0] = 0;
-      this.generateDiscGalaxy(1, 0, 0, 0, 0, 0, 0, N - 1, 1200);
-    } else if (type === 'collapse') {
-      for (let i = 0; i < N; i++) {
-        const r = Math.cbrt(Math.random()) * 1200;
-        const theta = Math.acos(2 * Math.random() - 1);
-        const phi = 2 * Math.PI * Math.random();
-
-        this.posX[i] = r * Math.sin(theta) * Math.cos(phi);
-        this.posY[i] = r * Math.sin(theta) * Math.sin(phi);
-        this.posZ[i] = r * Math.cos(theta);
-
-        this.velX[i] = (Math.random() - 0.5) * 0.5;
-        this.velY[i] = (Math.random() - 0.5) * 0.5;
-        this.velZ[i] = (Math.random() - 0.5) * 0.5;
-        this.mass[i] = 1.0 + Math.random() * 2.0;
-      }
-    }
-
-    this.geometry.setDrawRange(0, N);
-  }
-
-  generateDiscGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
-    this.mass[offset] = 3000;
-    this.posX[offset] = cx;
-    this.posY[offset] = cy;
-    this.posZ[offset] = cz;
-    this.velX[offset] = vx;
-    this.velY[offset] = vy;
-    this.velZ[offset] = vz;
-
-    for (let i = 1; i < count; i++) {
-      const idx = offset + i;
-      const r = Math.sqrt(Math.random()) * radius + 30;
-      const angle = Math.random() * Math.PI * 2;
-
-      this.posX[idx] = cx + r * Math.cos(angle);
-      this.posY[idx] = cy + (Math.random() - 0.5) * 40;
-      this.posZ[idx] = cz + r * Math.sin(angle);
-
-      const v = Math.sqrt((this.G * 3000) / r);
-      this.velX[idx] = vx - v * Math.sin(angle);
-      this.velY[idx] = vy + (Math.random() - 0.5) * 0.2;
-      this.velZ[idx] = vz + v * Math.cos(angle);
-      this.mass[idx] = 1.0;
-    }
-  }
-
-  initInteraction() {
-    this.raycaster = new THREE.Raycaster();
-    this.mouse = new THREE.Vector2();
-    this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    this.attractorActive = false;
-    this.attractorPos = new THREE.Vector3();
-
-    const markerGeo = new THREE.SphereGeometry(20, 16, 16);
-    const markerMat = new THREE.MeshBasicMaterial({ color: 0xff0055, wireframe: true });
-    this.attractorMesh = new THREE.Mesh(markerGeo, markerMat);
-    this.attractorMesh.visible = false;
-    this.scene.add(this.attractorMesh);
-
-    window.addEventListener('mousemove', (e) => {
-      this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-
-      if (e.buttons === 1 && e.shiftKey) {
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-        this.raycaster.ray.intersectPlane(this.plane, this.attractorPos);
-        this.attractorMesh.position.copy(this.attractorPos);
-        this.attractorActive = true;
-        this.attractorMesh.visible = true;
-      } else {
-        this.attractorActive = false;
-        this.attractorMesh.visible = false;
-      }
-    });
-  }
-
-  initUI() {
-    const countSlider = document.getElementById('countSlider');
-    const countValue = document.getElementById('countValue');
-    countSlider.addEventListener('input', (e) => {
-      this.particleCount = parseInt(e.target.value);
-      countValue.innerText = this.particleCount;
-      this.loadPreset(this.activePreset);
-    });
-
-    const thetaSlider = document.getElementById('thetaSlider');
-    const thetaValue = document.getElementById('thetaValue');
-    thetaSlider.addEventListener('input', (e) => {
-      this.theta = parseFloat(e.target.value);
-      thetaValue.innerText = this.theta.toFixed(2);
-    });
-
-    const gSlider = document.getElementById('gSlider');
-    const gValue = document.getElementById('gValue');
-    gSlider.addEventListener('input', (e) => {
-      this.G = parseFloat(e.target.value);
-      gValue.innerText = this.G.toFixed(1);
-    });
-
-    document.getElementById('octreeToggle').addEventListener('change', (e) => {
-      this.showOctree = e.target.checked;
-      this.lineSegments.visible = this.showOctree;
-    });
-
-    document.getElementById('btnGalaxy').addEventListener('click', () => this.loadPreset('galaxy'));
-    document.getElementById('btnAccretion').addEventListener('click', () => this.loadPreset('accretion'));
-    document.getElementById('btnCollapse').addEventListener('click', () => this.loadPreset('collapse'));
-
-    this.fpsElem = document.getElementById('fpsDisplay');
-    this.physicsElem = document.getElementById('physicsDisplay');
-    this.nodesElem = document.getElementById('nodesDisplay');
-
-    this.lastTime = performance.now();
-    this.frameCount = 0;
-  }
-
-  updatePhysics() {
-    const t0 = performance.now();
-    const N = this.particleCount;
-
-    for (let i = 0; i < N; i++) {
-      this.accX[i] = 0;
-      this.accY[i] = 0;
-      this.accZ[i] = 0;
-    }
-
-    this.octree.clear();
-    const root = this.octree.buildTree(this.posX, this.posY, this.posZ, this.mass, N);
-    this.nodesElem.innerText = this.octree.nodesUsed;
-
-    for (let i = 0; i < N; i++) {
-      this.octree.calculateForce(root, i, this.posX, this.posY, this.posZ, this.accX, this.accY, this.accZ, this.theta, this.G, this.softening);
-
-      if (this.attractorActive) {
-        const dx = this.attractorPos.x - this.posX[i];
-        const dy = this.attractorPos.y - this.posY[i];
-        const dz = this.attractorPos.z - this.posZ[i];
-        const distSq = dx * dx + dy * dy + dz * dz + 500;
+        const distSq = dx * dx + dy * dy + dz * dz + softening;
         const dist = Math.sqrt(distSq);
-        const force = (this.G * 10000) / (distSq * dist);
-        this.accX[i] += dx * force;
-        this.accY[i] += dy * force;
-        this.accZ[i] += dz * force;
+
+        if (node.particleCount === 1 && node.particleIdx === pIdx) return;
+
+        if ((node.halfWidth * 2) / dist < theta || node.particleCount === 1) {
+          let force = (G * node.totalMass) / (distSq * dist);
+          
+          // Post-Newtonian Relativistic Precession Correction
+          if (enableRelativity) {
+            const c = 300.0;
+            const rSchwarzschild = (2 * G * node.totalMass) / (c * c);
+            force *= (1.0 + (3.0 * rSchwarzschild) / dist);
+          }
+
+          accX[pIdx] += dx * force;
+          accY[pIdx] += dy * force;
+          accZ[pIdx] += dz * force;
+        } else {
+          for (let i = 0; i < 8; i++) {
+            if (node.children[i]) {
+              this.calculateForce(node.children[i], pIdx, posX, posY, posZ, accX, accY, accZ, theta, G, softening, enableRelativity);
+            }
+          }
+        }
       }
     }
 
-    for (let i = 0; i < N; i++) {
-      this.velX[i] += this.accX[i] * this.dt;
-      this.velY[i] += this.accY[i] * this.dt;
-      this.velZ[i] += this.accZ[i] * this.dt;
+    // --- MAIN SIMULATION CLASS ---
+    class ChronosSimulation {
+      constructor() {
+        this.particleCount = 1200;
+        this.maxParticles = 5000;
+        this.theta = 0.5;
+        this.G = 1.0;
+        this.softening = 80;
+        this.dt = 0.4;
+        this.isPaused = false;
+        this.enableRelativity = true;
 
-      this.posX[i] += this.velX[i] * this.dt;
-      this.posY[i] += this.velY[i] * this.dt;
-      this.posZ[i] += this.velZ[i] * this.dt;
+        // Particle Buffers
+        this.posX = new Float32Array(this.maxParticles);
+        this.posY = new Float32Array(this.maxParticles);
+        this.posZ = new Float32Array(this.maxParticles);
+        this.velX = new Float32Array(this.maxParticles);
+        this.velY = new Float32Array(this.maxParticles);
+        this.velZ = new Float32Array(this.maxParticles);
+        this.accX = new Float32Array(this.maxParticles);
+        this.accY = new Float32Array(this.maxParticles);
+        this.accZ = new Float32Array(this.maxParticles);
+        this.mass = new Float32Array(this.maxParticles);
+        this.vMag = new Float32Array(this.maxParticles);
 
-      const vx = this.velX[i], vy = this.velY[i], vz = this.velZ[i];
-      this.vMag[i] = Math.sqrt(vx * vx + vy * vy + vz * vz);
-    }
+        this.flatPosBuffer = new Float32Array(this.maxParticles * 3);
+        this.tree = new BarnesHutTree(this.maxParticles * 8);
 
-    if (this.showOctree) {
-      const lineIndex = this.octree.renderWireframes(root, this.linePositions, 0);
-      this.lineGeometry.setDrawRange(0, lineIndex / 3);
-      this.lineGeometry.attributes.position.needsUpdate = true;
-    }
+        this.initialEnergy = 0;
 
-    this.geometry.attributes.position.needsUpdate = true;
-    this.geometry.attributes.vMag.needsUpdate = true;
+        this.initThree();
+        this.initGrid();
+        this.initParticles();
+        this.initChart();
+        this.initUI();
+        this.loadPreset('galaxy');
+        this.animate();
+      }
 
-    const t1 = performance.now();
-    this.physicsElem.innerText = (t1 - t0).toFixed(1);
-  }
+      initThree() {
+        this.scene = new THREE.Scene();
+        this.scene.fog = new THREE.FogExp2(0x020208, 0.00015);
 
-  animate() {
-    requestAnimationFrame(() => this.animate());
+        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 50000);
+        this.camera.position.set(0, 1200, 2200);
 
-    this.updatePhysics();
-    this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setClearColor(0x020208, 1);
+        document.body.insertBefore(this.renderer.domElement, document.body.firstChild);
 
-    this.frameCount++;
-    const now = performance.now();
-    if (now - this.lastTime >= 1000) {
-      this.fpsElem.innerText = Math.round((this.frameCount * 1000) / (now - this.lastTime));
-      this.frameCount = 0;
-      this.lastTime = now;
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+
+        window.addEventListener('resize', () => {
+          this.camera.aspect = window.innerWidth / window.innerHeight;
+          this.camera.updateProjectionMatrix();
+          this.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      initGrid() {
+        this.gridSize = 60;
+        this.gridSpacing = 80;
+        this.gridGeo = new THREE.PlaneGeometry(
+          this.gridSize * this.gridSpacing,
+          this.gridSize * this.gridSpacing,
+          this.gridSize,
+          this.gridSize
+        );
+        this.gridGeo.rotateX(-Math.PI / 2);
+
+        this.gridMat = new THREE.MeshBasicMaterial({
+          color: 0x00f3ff,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.12
+        });
+
+        this.gridMesh = new THREE.Mesh(this.gridGeo, this.gridMat);
+        this.gridMesh.position.y = -300;
+        this.scene.add(this.gridMesh);
+        this.gridOriginalPos = this.gridGeo.attributes.position.clone();
+      }
+
+      initParticles() {
+        this.geometry = new THREE.BufferGeometry();
+        this.posAttr = new THREE.BufferAttribute(this.flatPosBuffer, 3);
+        this.vMagAttr = new THREE.BufferAttribute(this.vMag, 1);
+
+        this.geometry.setAttribute('position', this.posAttr);
+        this.geometry.setAttribute('vMag', this.vMagAttr);
+
+        this.material = new THREE.ShaderMaterial({
+          vertexShader: `
+            attribute float vMag;
+            varying float vVelocity;
+            void main() {
+              vVelocity = vMag;
+              vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+              gl_PointSize = clamp(250.0 / -mvPosition.z, 2.0, 10.0);
+              gl_Position = projectionMatrix * mvPosition;
+            }
+          `,
+          fragmentShader: `
+            varying float vVelocity;
+            void main() {
+              float d = length(gl_PointCoord - vec2(0.5));
+              if (d > 0.5) discard;
+              float alpha = smoothstep(0.5, 0.0, d);
+              float normV = clamp(vVelocity / 15.0, 0.0, 1.0);
+
+              vec3 colorLow = vec3(0.1, 0.4, 1.0);
+              vec3 colorMid = vec3(0.8, 0.2, 0.8);
+              vec3 colorHigh = vec3(1.0, 0.9, 0.3);
+
+              vec3 color = mix(colorLow, colorMid, smoothstep(0.0, 0.5, normV));
+              color = mix(color, colorHigh, smoothstep(0.5, 1.0, normV));
+
+              gl_FragColor = vec4(color, alpha * 0.9);
+            }
+          `,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+
+        this.particleSystem = new THREE.Points(this.geometry, this.material);
+        this.scene.add(this.particleSystem);
+      }
+
+      initChart() {
+        const ctx = document.getElementById('energyChart').getContext('2d');
+        this.chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: Array(30).fill(''),
+            datasets: [
+              { label: 'Kinetic (Ek)', data: Array(30).fill(0), borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+              { label: 'Potential (Ep)', data: Array(30).fill(0), borderColor: '#a855f7', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+              { label: 'Total (Et)', data: Array(30).fill(0), borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0, tension: 0.3 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { display: false },
+              y: { display: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748b', font: { size: 9 } } }
+            }
+          }
+        });
+      }
+
+      loadPreset(preset) {
+        const N = this.particleCount;
+        for (let i = 0; i < this.maxParticles; i++) {
+          this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
+          this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
+          this.mass[i] = 1.0;
+        }
+
+        if (preset === 'galaxy') {
+          const half = Math.floor(N / 2);
+          this.spawnGalaxy(0, -500, 0, 0, 20, 0, -10, half, 700);
+          this.spawnGalaxy(half, 500, 0, 0, -20, 0, 10, N - half, 700);
+        } else if (preset === 'solar') {
+          this.mass[0] = 10000;
+          for (let i = 1; i < N; i++) {
+            const r = 150 + Math.random() * 1200;
+            const angle = Math.random() * Math.PI * 2;
+            this.posX[i] = r * Math.cos(angle);
+            this.posZ[i] = r * Math.sin(angle);
+            this.posY[i] = (Math.random() - 0.5) * 10;
+
+            const v = Math.sqrt((this.G * 10000) / r);
+            this.velX[i] = -v * Math.sin(angle);
+            this.velZ[i] = v * Math.cos(angle);
+            this.mass[i] = 0.5 + Math.random() * 2.0;
+          }
+        } else if (preset === 'figure8') {
+          const m = 1000;
+          const x1 = -0.97000436 * 600, y1 = 0.24308753 * 600;
+          const vx1 = 0.46620531 * 5, vy1 = 0.43236573 * 5;
+
+          this.mass[0] = m; this.posX[0] = x1; this.posY[0] = y1; this.velX[0] = vx1; this.velY[0] = vy1;
+          this.mass[1] = m; this.posX[1] = -x1; this.posY[1] = -y1; this.velX[1] = vx1; this.velY[1] = vy1;
+          this.mass[2] = m; this.posX[2] = 0; this.posY[2] = 0; this.velX[2] = -2 * vx1; this.velY[2] = -2 * vy1;
+          this.particleCount = 3;
+        }
+
+        this.computeEnergies(true);
+      }
+
+      spawnGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
+        this.mass[offset] = 4000;
+        this.posX[offset] = cx; this.posY[offset] = cy; this.posZ[offset] = cz;
+        this.velX[offset] = vx; this.velY[offset] = vy; this.velZ[offset] = vz;
+
+        for (let i = 1; i < count; i++) {
+          const idx = offset + i;
+          const r = Math.sqrt(Math.random()) * radius + 40;
+          const angle = Math.random() * Math.PI * 2;
+
+          this.posX[idx] = cx + r * Math.cos(angle);
+          this.posY[idx] = cy + (Math.random() - 0.5) * 20;
+          this.posZ[idx] = cz + r * Math.sin(angle);
+
+          const v = Math.sqrt((this.G * 4000) / r);
+          this.velX[idx] = vx - v * Math.sin(angle);
+          this.velY[idx] = vy;
+          this.velZ[idx] = vz + v * Math.cos(angle);
+          this.mass[idx] = 1.0;
+        }
+      }
+
+      updatePhysics() {
+        if (this.isPaused) return;
+
+        const N = this.particleCount;
+        for (let i = 0; i < N; i++) {
+          this.accX[i] = 0; this.accY[i] = 0; this.accZ[i] = 0;
+        }
+
+        this.tree.build(this.posX, this.posY, this.posZ, this.mass, N);
+
+        for (let i = 0; i < N; i++) {
+          this.tree.calculateForce(
+            this.tree.root, i, this.posX, this.posY, this.posZ,
+            this.accX, this.accY, this.accZ,
+            this.theta, this.G, this.softening, this.enableRelativity
+          );
+        }
+
+        // Symplectic Velocity Verlet Integration
+        for (let i = 0; i < N; i++) {
+          this.velX[i] += this.accX[i] * this.dt;
+          this.velY[i] += this.accY[i] * this.dt;
+          this.velZ[i] += this.accZ[i] * this.dt;
+
+          this.posX[i] += this.velX[i] * this.dt;
+          this.posY[i] += this.velY[i] * this.dt;
+          this.posZ[i] += this.velZ[i] * this.dt;
+
+          const vx = this.velX[i], vy = this.velY[i], vz = this.velZ[i];
+          this.vMag[i] = Math.sqrt(vx * vx + vy * vy + vz * vz);
+
+          this.flatPosBuffer[i * 3] = this.posX[i];
+          this.flatPosBuffer[i * 3 + 1] = this.posY[i];
+          this.flatPosBuffer[i * 3 + 2] = this.posZ[i];
+        }
+
+        this.geometry.attributes.position.needsUpdate = true;
+        this.geometry.attributes.vMag.needsUpdate = true;
+        this.geometry.setDrawRange(0, N);
+
+        this.updateSpacetimeGrid();
+        this.computeEnergies(false);
+      }
+
+      updateSpacetimeGrid() {
+        const posArr = this.gridGeo.attributes.position.array;
+        const origArr = this.gridOriginalPos.array;
+        const N = this.particleCount;
+
+        for (let i = 0; i < posArr.length; i += 3) {
+          const gx = origArr[i];
+          const gz = origArr[i + 2];
+          let dip = 0;
+
+          for (let p = 0; p < Math.min(N, 10); p++) {
+            if (this.mass[p] > 500) {
+              const dx = gx - this.posX[p];
+              const dz = gz - this.posZ[p];
+              const distSq = dx * dx + dz * dz + 10000;
+              dip += (this.mass[p] * 80) / Math.sqrt(distSq);
+            }
+          }
+          posArr[i + 1] = origArr[i + 1] - dip;
+        }
+        this.gridGeo.attributes.position.needsUpdate = true;
+      }
+
+      computeEnergies(setInitial = false) {
+        let ek = 0;
+        let ep = 0;
+        const N = this.particleCount;
+
+        for (let i = 0; i < N; i++) {
+          ek += 0.5 * this.mass[i] * (this.velX[i] ** 2 + this.velY[i] ** 2 + this.velZ[i] ** 2);
+        }
+
+        for (let i = 0; i < Math.min(N, 150); i++) {
+          for (let j = i + 1; j < Math.min(N, 150); j++) {
+            const dx = this.posX[j] - this.posX[i];
+            const dy = this.posY[j] - this.posY[i];
+            const dz = this.posZ[j] - this.posZ[i];
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz + this.softening);
+            ep -= (this.G * this.mass[i] * this.mass[j]) / dist;
+          }
+        }
+
+        const et = ek + ep;
+        if (setInitial || this.initialEnergy === 0) this.initialEnergy = et;
+
+        const drift = Math.abs((et - this.initialEnergy) / (this.initialEnergy || 1)) * 100;
+
+        document.getElementById('stat-ek').innerText = ek.toFixed(0);
+        document.getElementById('stat-ep').innerText = ep.toFixed(0);
+        document.getElementById('stat-et').innerText = et.toFixed(0);
+        document.getElementById('stat-drift').innerText = drift.toFixed(2) + '%';
+
+        // Update Chart
+        if (this.frameCount % 10 === 0) {
+          const datasets = this.chart.data.datasets;
+          datasets[0].data.shift(); datasets[0].data.push(ek);
+          datasets[1].data.shift(); datasets[1].data.push(ep);
+          datasets[2].data.shift(); datasets[2].data.push(et);
+          this.chart.update('none');
+        }
+      }
+
+      initUI() {
+        this.lastTime = performance.now();
+        this.frameCount = 0;
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+          this.isPaused = !this.isPaused;
+          document.getElementById('pauseBtn').innerText = this.isPaused ? 'Resume' : 'Pause';
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+          this.loadPreset('galaxy');
+        });
+
+        document.getElementById('btnGalaxy').addEventListener('click', () => this.loadPreset('galaxy'));
+        document.getElementById('btnSolar').addEventListener('click', () => this.loadPreset('solar'));
+        document.getElementById('btnFigure8').addEventListener('click', () => this.loadPreset('figure8'));
+      }
+
+      animate() {
+        requestAnimationFrame(() => this.animate());
+
+        this.updatePhysics();
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+
+        this.frameCount++;
+        const now = performance.now();
+        if (now - this.lastTime >= 1000) {
+          document.getElementById('stat-fps').innerText = Math.round((this.frameCount * 1000) / (now - this.lastTime));
+          this.frameCount = 0;
+                this.lastTime = now;
     }
   }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  new Simulation();
+  new ChronosSimulation();
 });
 </script>
 </body>
