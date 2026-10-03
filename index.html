@@ -1,0 +1,931 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="h-full w-full overflow-hidden bg-slate-950">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chronos-N: N-Body Barnes-Hut Gravitational & Galaxy Simulator</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Three.js & OrbitControls CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      user-select: none;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom Scrollbar for Controls Drawer */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(71, 85, 105, 1);
+    }
+    /* Custom Range Inputs */
+    input[type=range] {
+      accent-color: #38bdf8;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body class="h-full w-full overflow-hidden text-slate-100 flex flex-col relative">
+
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container" class="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"></div>
+
+  <!-- Top Navigation Header -->
+  <header class="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
+    <div class="glass-panel px-4 py-2.5 rounded-xl flex items-center gap-3 pointer-events-auto shadow-2xl">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-cyan-500/30">
+        <i class="fa-solid to-atom fa-atom animate-spin-slow"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-sky-200 to-indigo-300 bg-clip-text text-transparent">
+          CHRONOS-N
+        </h1>
+        <p class="text-[10px] text-slate-400 font-medium tracking-wide">
+          BARNES-HUT $O(N \log N)$ GRAVITATIONAL SIMULATOR
+        </p>
+      </div>
+    </div>
+
+    <!-- Quick Actions / Simulation State Badges -->
+    <div class="flex items-center gap-3 pointer-events-auto">
+      <div id="status-toast" class="hidden glass-panel px-3 py-1.5 rounded-lg text-xs font-mono text-cyan-300 flex items-center gap-2 transition-all duration-300">
+        <i class="fa-solid fa-circle-info text-cyan-400"></i>
+        <span id="status-toast-text">Simulation initialized</span>
+      </div>
+
+      <button id="toggle-panel-btn" class="glass-panel hover:bg-slate-800/80 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition shadow-xl">
+        <i class="fa-solid fa-sliders text-cyan-400"></i>
+        <span>Controls</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Left Stats Overlay Floating HUD -->
+  <div class="absolute bottom-4 left-4 z-10 pointer-events-none">
+    <div class="glass-panel p-4 rounded-2xl w-64 pointer-events-auto shadow-2xl border border-slate-800/80">
+      <div class="flex items-center justify-between border-b border-slate-800/80 pb-2 mb-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <i class="fa-solid fa-chart-line text-cyan-400"></i> Performance HUD
+        </span>
+        <span id="fps-badge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+          60 FPS
+        </span>
+      </div>
+
+      <div class="space-y-2.5 font-mono text-xs">
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400 text-[11px]">Particles (N):</span>
+          <span id="stat-particles" class="text-cyan-300 font-bold">10,000</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400 text-[11px]">Octree Nodes:</span>
+          <span id="stat-nodes" class="text-indigo-300 font-bold">4,210</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400 text-[11px]">Physics Frame:</span>
+          <span id="stat-physics-time" class="text-amber-300 font-bold">4.2 ms</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400 text-[11px]">Render Frame:</span>
+          <span id="stat-render-time" class="text-sky-300 font-bold">2.1 ms</span>
+        </div>
+      </div>
+
+      <!-- Mouse Gravity Mode Indicator -->
+      <div class="mt-3.5 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+        <span class="text-slate-400">Mouse Attractor:</span>
+        <span id="mouse-mode-badge" class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-slate-400 border border-slate-700">
+          [HOLD LEFT CLICK]
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Floating Control Drawer -->
+  <aside id="controls-panel" class="absolute top-20 right-4 bottom-4 w-80 z-20 glass-panel rounded-2xl flex flex-col shadow-2xl overflow-hidden transition-all duration-300 transform translate-x-0 border border-slate-800/90">
+    <!-- Panel Header -->
+    <div class="p-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/40">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-microchip text-cyan-400 text-sm"></i>
+        <h2 class="text-sm font-bold text-slate-100">Parameters & Presets</h2>
+      </div>
+      <button id="close-panel-btn" class="text-slate-400 hover:text-white transition p-1 text-sm">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Scrollable Controls Body -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-5">
+
+      <!-- Presets Selector -->
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+          Cosmic Scenario Presets
+        </label>
+        <div class="grid grid-cols-1 gap-2">
+          <button data-preset="collision" class="preset-btn p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-left transition flex items-center gap-3 active-preset">
+            <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+              <i class="fa-solid fa-arrows-to-circle text-sm"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-slate-200">Galactic Collision</div>
+              <div class="text-[10px] text-slate-400">Two colliding spiral galaxies</div>
+            </div>
+          </button>
+
+          <button data-preset="accretion" class="preset-btn p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-left transition flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+              <i class="fa-solid fa-sun text-sm"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-slate-200">Accretion Disk</div>
+              <div class="text-[10px] text-slate-400">Massive central attractor disk</div>
+            </div>
+          </button>
+
+          <button data-preset="collapse" class="preset-btn p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/60 text-left transition flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+              <i class="fa-solid fa-compress text-sm"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-slate-200">Protostellar Collapse</div>
+              <div class="text-[10px] text-slate-400">Uniform cloud self-gravity collapse</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Playback Actions -->
+      <div class="pt-2 border-t border-slate-800/80">
+        <div class="grid grid-cols-3 gap-2">
+          <button id="btn-play-pause" class="py-2.5 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-lg shadow-cyan-500/20">
+            <i class="fa-solid fa-pause" id="play-icon"></i>
+            <span id="play-text">Pause</span>
+          </button>
+          <button id="btn-step" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition">
+            <i class="fa-solid fa-forward-step"></i>
+            <span>Step</span>
+          </button>
+          <button id="btn-reset" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>Reset</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Barnes-Hut & Physics Sliders -->
+      <div class="space-y-4 pt-2 border-t border-slate-800/80">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+          Physics Engine Parameters
+        </span>
+
+        <!-- Particle Count -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Particles (N):</span>
+            <span id="val-particles" class="font-mono text-cyan-400 font-bold">10,000</span>
+          </div>
+          <input id="slider-particles" type="range" min="1000" max="20000" step="1000" value="10000" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+
+        <!-- Theta (Multipole Criterion) -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300 flex items-center gap-1">
+              Theta ($\theta$ Accuracy):
+            </span>
+            <span id="val-theta" class="font-mono text-cyan-400 font-bold">0.50</span>
+          </div>
+          <input id="slider-theta" type="range" min="0.1" max="1.5" step="0.05" value="0.50" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+          <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
+            <span>0.1 (Exact $O(N^2)$)</span>
+            <span>1.5 (Fast Fast)</span>
+          </div>
+        </div>
+
+        <!-- Gravitational Constant G -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Gravity Constant ($G$):</span>
+            <span id="val-g" class="font-mono text-cyan-400 font-bold">1.50</span>
+          </div>
+          <input id="slider-g" type="range" min="0.1" max="5.0" step="0.1" value="1.50" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+
+        <!-- Time Step dt -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Time Step ($\Delta t$):</span>
+            <span id="val-dt" class="font-mono text-cyan-400 font-bold">0.012</span>
+          </div>
+          <input id="slider-dt" type="range" min="0.001" max="0.040" step="0.001" value="0.012" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+
+        <!-- Softening Factor epsilon -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Plummer Softening ($\epsilon$):</span>
+            <span id="val-softening" class="font-mono text-cyan-400 font-bold">12.0</span>
+          </div>
+          <input id="slider-softening" type="range" min="1.0" max="40.0" step="1.0" value="12.0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+      </div>
+
+      <!-- Visualization Options -->
+      <div class="space-y-3 pt-2 border-t border-slate-800/80">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+          Visual Style & GLSL
+        </span>
+
+        <!-- Particle Size -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Point Scale:</span>
+            <span id="val-point-size" class="font-mono text-cyan-400 font-bold">16.0</span>
+          </div>
+          <input id="slider-point-size" type="range" min="4.0" max="40.0" step="1.0" value="16.0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+
+        <!-- Velocity Heatmap Threshold -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Heatmap Max Velocity:</span>
+            <span id="val-max-vel" class="font-mono text-cyan-400 font-bold">35.0</span>
+          </div>
+          <input id="slider-max-vel" type="range" min="5.0" max="100.0" step="1.0" value="35.0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+
+        <!-- Octree Wireframe Toggle -->
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-xs text-slate-300">Render Octree Bounds:</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="toggle-octree-wire" class="sr-only peer">
+            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Camera Controls -->
+      <div class="pt-2 border-t border-slate-800/80 pb-2">
+        <button id="btn-reset-cam" class="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 border border-slate-700/80 transition">
+          <i class="fa-solid fa-camera-rotate"></i>
+          <span>Reset Camera View</span>
+        </button>
+      </div>
+
+    </div>
+  </aside>
+
+  <script>
+
+    /**
+     * Reusable Octree Node Structure for Barnes-Hut.
+     * Memory Pooling is critical to avoid JS garbage collection frame drops.
+     */
+    class OctreeNode {
+      constructor() {
+        this.cx = 0;
+        this.cy = 0;
+        this.cz = 0;
+        this.halfSize = 0;
+        
+        this.mass = 0;
+        this.comX = 0;
+        this.comY = 0;
+        this.comZ = 0;
+        
+        this.particleCount = 0;
+        this.particleIdx = -1; // Index of particle if leaf node
+        this.children = [null, null, null, null, null, null, null, null];
+        this.isLeaf = true;
+      }
+
+      reset() {
+        this.cx = 0; this.cy = 0; this.cz = 0;
+        this.halfSize = 0;
+        this.mass = 0;
+        this.comX = 0; this.comY = 0; this.comZ = 0;
+        this.particleCount = 0;
+        this.particleIdx = -1;
+        this.isLeaf = true;
+        for (let i = 0; i < 8; i++) {
+          this.children[i] = null;
+        }
+      }
+    }
+
+    /**
+     * Memory Pool manager for pre-allocated OctreeNodes.
+     */
+    class OctreePool {
+      constructor(capacity = 100000) {
+        this.pool = new Array(capacity);
+        for (let i = 0; i < capacity; i++) {
+          this.pool[i] = new OctreeNode();
+        }
+        this.index = 0;
+      }
+
+      get() {
+        if (this.index >= this.pool.length) {
+          // Expand pool if capacity exceeded
+          this.pool.push(new OctreeNode());
+        }
+        const node = this.pool[this.index++];
+        node.reset();
+        return node;
+      }
+
+      reset() {
+        this.index = 0;
+      }
+    }
+
+
+    class BarnesHutTree {
+      constructor(maxParticles = 30000) {
+        this.pool = new OctreePool(maxParticles * 6);
+        this.root = null;
+        this.activeNodes = 0;
+      }
+
+      /**
+       * Builds the octree over the current particle positions.
+       */
+      build(posX, posY, posZ, mass, count) {
+        this.pool.reset();
+        
+        if (count === 0) return;
+
+        // 1. Calculate bounding box of all active particles
+        let minX = posX[0], maxX = posX[0];
+        let minY = posY[0], maxY = posY[0];
+        let minZ = posZ[0], maxZ = posZ[0];
+
+        for (let i = 1; i < count; i++) {
+          const x = posX[i], y = posY[i], z = posZ[i];
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+          if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        }
+
+        // Make spatial domain cubic
+        const cx = (minX + maxX) * 0.5;
+        const cy = (minY + maxY) * 0.5;
+        const cz = (minZ + maxZ) * 0.5;
+        
+        let size = Math.max(maxX - minX, maxY - minY, maxZ - minZ) * 0.5;
+        size = Math.max(size, 10.0); // Minimum domain size boundary
+
+        this.root = this.pool.get();
+        this.root.cx = cx;
+        this.root.cy = cy;
+        this.root.cz = cz;
+        this.root.halfSize = size;
+
+        // 2. Insert all particles into Octree
+        for (let i = 0; i < count; i++) {
+          this.insert(this.root, i, posX, posY, posZ, mass, 0);
+        }
+
+        // 3. Compute Mass and Center of Mass for all nodes
+        this.computeMassDistribution(this.root, posX, posY, posZ, mass);
+
+        this.activeNodes = this.pool.index;
+      }
+
+      insert(node, pIdx, posX, posY, posZ, mass, depth) {
+        // Prevent recursion limit overflow for identical coordinates
+        if (depth > 22) return;
+
+        const px = posX[pIdx], py = posY[pIdx], pz = posZ[pIdx];
+
+        if (node.particleCount === 0) {
+          // Empty leaf node: store particle
+          node.particleIdx = pIdx;
+          node.particleCount = 1;
+          return;
+        }
+
+        if (node.isLeaf && node.particleCount === 1) {
+          // Subdivide leaf node containing single particle into 8 children
+          node.isLeaf = false;
+          const existingIdx = node.particleIdx;
+          node.particleIdx = -1;
+
+          // Re-insert existing particle
+          this.insertIntoSubchild(node, existingIdx, posX, posY, posZ, mass, depth);
+          // Insert new particle
+          this.insertIntoSubchild(node, pIdx, posX, posY, posZ, mass, depth);
+          node.particleCount = 2;
+        } else {
+          // Internal node: insert into correct child
+          this.insertIntoSubchild(node, pIdx, posX, posY, posZ, mass, depth);
+          node.particleCount++;
+        }
+      }
+
+        insertIntoSubchild(node, pIdx, posX, posY, posZ, mass, depth) {
+    const px = posX[pIdx], py = posY[pIdx], pz = posZ[pIdx];
+
+    // Determine octant index (0..7)
+    let octant = 0;
+    if (px >= node.cx) octant |= 1;
+    if (py >= node.cy) octant |= 2;
+    if (pz >= node.cz) octant |= 4;
+
+    if (!node.children[octant]) {
+      const half = node.halfWidth * 0.5;
+      const cx = node.cx + ((octant & 1) ? half : -half);
+      const cy = node.cy + ((octant & 2) ? half : -half);
+      const cz = node.cz + ((octant & 4) ? half : -half);
+      node.children[octant] = this.getNode(cx, cy, cz, half);
+    }
+
+    this.insert(node.children[octant], pIdx, posX, posY, posZ, mass, depth + 1);
+  }
+
+  // Compute mass and center of mass recursively
+  computeMassDistribution(node, posX, posY, posZ, mass) {
+    if (!node) return;
+
+    if (node.particleCount === 1) {
+      const pIdx = node.particleIdx;
+      node.totalMass = mass[pIdx];
+      node.comX = posX[pIdx];
+      node.comY = posY[pIdx];
+      node.comZ = posZ[pIdx];
+      return;
+    }
+
+    let totalM = 0;
+    let comX = 0, comY = 0, comZ = 0;
+
+    for (let i = 0; i < 8; i++) {
+      const child = node.children[i];
+      if (child) {
+        this.computeMassDistribution(child, posX, posY, posZ, mass);
+        totalM += child.totalMass;
+        comX += child.comX * child.totalMass;
+        comY += child.comY * child.totalMass;
+        comZ += child.comZ * child.totalMass;
+      }
+    }
+
+    if (totalM > 0) {
+      node.totalMass = totalM;
+      node.comX = comX / totalM;
+      node.comY = comY / totalM;
+      node.comZ = comZ / totalM;
+    }
+  }
+
+  // Calculate gravitational acceleration on particle pIdx
+  calculateForce(node, pIdx, posX, posY, posZ, accX, accY, accZ, theta, G, softening) {
+    if (!node || node.totalMass === 0) return;
+
+    const px = posX[pIdx];
+    const py = posY[pIdx];
+    const pz = posZ[pIdx];
+
+    const dx = node.comX - px;
+    const dy = node.comY - py;
+    const dz = node.comZ - pz;
+
+    const distSq = dx * dx + dy * dy + dz * dz + softening;
+    const dist = Math.sqrt(distSq);
+
+    // If leaf with 1 particle (itself), ignore
+    if (node.particleCount === 1 && node.particleIdx === pIdx) {
+      return;
+    }
+
+    // Barnes-Hut criterion: (size / distance) < theta or leaf node
+    if ((node.halfWidth * 2) / dist < theta || node.particleCount === 1) {
+      const force = (G * node.totalMass) / (distSq * dist);
+      accX[pIdx] += dx * force;
+      accY[pIdx] += dy * force;
+      accZ[pIdx] += dz * force;
+    } else {
+      // Internal node, recurse into children
+      for (let i = 0; i < 8; i++) {
+        if (node.children[i]) {
+          this.calculateForce(node.children[i], pIdx, posX, posY, posZ, accX, accY, accZ, theta, G, softening);
+        }
+      }
+    }
+  }
+
+  // Visual debugging helper: draw octree wireframes
+  renderWireframes(node, linePositions, lineIndex) {
+    if (!node) return lineIndex;
+
+    // Draw bounding box if node has particles
+    if (node.particleCount > 0) {
+      const hw = node.halfWidth;
+      const cx = node.cx, cy = node.cy, cz = node.cz;
+
+      // 12 edges of box
+      const corners = [
+        [cx - hw, cy - hw, cz - hw], [cx + hw, cy - hw, cz - hw],
+        [cx + hw, cy + hw, cz - hw], [cx - hw, cy + hw, cz - hw],
+        [cx - hw, cy - hw, cz + hw], [cx + hw, cy - hw, cz + hw],
+        [cx + hw, cy + hw, cz + hw], [cx - hw, cy + hw, cz + hw]
+      ];
+
+      const edges = [
+        [0,1],[1,2],[2,3],[3,0],
+        [4,5],[5,6],[6,7],[7,4],
+        [0,4],[1,5],[2,6],[3,7]
+      ];
+
+      for (let e = 0; e < edges.length; e++) {
+        if (lineIndex + 6 <= linePositions.length) {
+          const p1 = corners[edges[e][0]];
+          const p2 = corners[edges[e][1]];
+          linePositions[lineIndex++] = p1[0];
+          linePositions[lineIndex++] = p1[1];
+          linePositions[lineIndex++] = p1[2];
+          linePositions[lineIndex++] = p2[0];
+          linePositions[lineIndex++] = p2[1];
+          linePositions[lineIndex++] = p2[2];
+        }
+      }
+
+      for (let i = 0; i < 8; i++) {
+        if (node.children[i]) {
+          lineIndex = this.renderWireframes(node.children[i], linePositions, lineIndex);
+        }
+      }
+    }
+    return lineIndex;
+  }
+}
+
+// --- MAIN SIMULATION CONTROLLER ---
+class Simulation {
+  constructor() {
+    this.particleCount = 15000;
+    this.maxParticles = 50000;
+    this.theta = 0.5;
+    this.G = 0.8;
+    this.softening = 100;
+    this.dt = 0.5;
+    this.activePreset = 'galaxy';
+    this.showOctree = false;
+
+    // Position, Velocity, Acceleration, Mass arrays
+    this.posX = new Float32Array(this.maxParticles);
+    this.posY = new Float32Array(this.maxParticles);
+    this.posZ = new Float32Array(this.maxParticles);
+    this.velX = new Float32Array(this.maxParticles);
+    this.velY = new Float32Array(this.maxParticles);
+    this.velZ = new Float32Array(this.maxParticles);
+    this.accX = new Float32Array(this.maxParticles);
+    this.accY = new Float32Array(this.maxParticles);
+    this.accZ = new Float32Array(this.maxParticles);
+    this.mass = new Float32Array(this.maxParticles);
+    this.vMag = new Float32Array(this.maxParticles);
+
+    this.octree = new BarnesHutOctree(this.maxParticles * 8);
+
+    this.initThreeJS();
+    this.initShaders();
+    this.initParticles();
+    this.initOctreeLines();
+    this.initInteraction();
+    this.initUI();
+    this.animate();
+  }
+
+  initThreeJS() {
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 50000);
+    this.camera.position.set(0, 1500, 2500);
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(this.renderer.domElement);
+
+    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.05;
+
+    window.addEventListener('resize', () => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  }
+
+  initShaders() {
+    this.geometry = new THREE.BufferGeometry();
+    this.posAttribute = new THREE.BufferAttribute(this.posX, 3);
+    this.vMagAttribute = new THREE.BufferAttribute(this.vMag, 1);
+
+    this.geometry.setAttribute('position', this.posAttribute);
+    this.geometry.setAttribute('vMag', this.vMagAttribute);
+
+    this.material = new THREE.ShaderMaterial({
+      vertexShader: `
+        attribute float vMag;
+        varying float vVelocity;
+        void main() {
+          vVelocity = vMag;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = clamp(300.0 / -mvPosition.z, 1.5, 8.0);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying float vVelocity;
+        void main() {
+          float d = length(gl_PointCoord - vec2(0.5));
+          if (d > 0.5) discard;
+          float alpha = smoothstep(0.5, 0.0, d);
+
+          float normV = clamp(vVelocity / 12.0, 0.0, 1.0);
+          vec3 colorLow = vec3(0.1, 0.3, 0.9);   // Deep Blue
+          vec3 colorMid = vec3(0.9, 0.2, 0.6);   // Magenta/Purple
+          vec3 colorHigh = vec3(1.0, 0.9, 0.4);  // Glowing Gold/White
+
+          vec3 color = mix(colorLow, colorMid, smoothstep(0.0, 0.5, normV));
+          color = mix(color, colorHigh, smoothstep(0.5, 1.0, normV));
+
+          gl_FragColor = vec4(color, alpha * 0.85);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    this.particleSystem = new THREE.Points(this.geometry, this.material);
+    this.scene.add(this.particleSystem);
+  }
+
+  initOctreeLines() {
+    const maxLines = 10000 * 12 * 2 * 3;
+    this.linePositions = new Float32Array(maxLines);
+    this.lineGeometry = new THREE.BufferGeometry();
+    this.lineGeometry.setAttribute('position', new THREE.BufferAttribute(this.linePositions, 3));
+    
+    this.lineMaterial = new THREE.LineBasicMaterial({
+      color: 0x00ffcc,
+      transparent: true,
+      opacity: 0.15
+    });
+
+    this.lineSegments = new THREE.LineSegments(this.lineGeometry, this.lineMaterial);
+    this.lineSegments.visible = false;
+    this.scene.add(this.lineSegments);
+  }
+
+  initParticles() {
+    this.loadPreset(this.activePreset);
+  }
+
+  loadPreset(type) {
+    this.activePreset = type;
+    const N = this.particleCount;
+
+    for (let i = 0; i < this.maxParticles; i++) {
+      this.posX[i] = 0; this.posY[i] = 0; this.posZ[i] = 0;
+      this.velX[i] = 0; this.velY[i] = 0; this.velZ[i] = 0;
+      this.mass[i] = 1.0;
+    }
+
+    if (type === 'galaxy') {
+      const half = Math.floor(N / 2);
+      this.generateDiscGalaxy(0, -600, 0, 0, 30, 2, -15, half, 800);
+      this.generateDiscGalaxy(half, 600, 0, 0, -30, -2, 15, N - half, 800);
+    } else if (type === 'accretion') {
+      this.mass[0] = 5000;
+      this.posX[0] = 0; this.posY[0] = 0; this.posZ[0] = 0;
+      this.generateDiscGalaxy(1, 0, 0, 0, 0, 0, 0, N - 1, 1200);
+    } else if (type === 'collapse') {
+      for (let i = 0; i < N; i++) {
+        const r = Math.cbrt(Math.random()) * 1200;
+        const theta = Math.acos(2 * Math.random() - 1);
+        const phi = 2 * Math.PI * Math.random();
+
+        this.posX[i] = r * Math.sin(theta) * Math.cos(phi);
+        this.posY[i] = r * Math.sin(theta) * Math.sin(phi);
+        this.posZ[i] = r * Math.cos(theta);
+
+        this.velX[i] = (Math.random() - 0.5) * 0.5;
+        this.velY[i] = (Math.random() - 0.5) * 0.5;
+        this.velZ[i] = (Math.random() - 0.5) * 0.5;
+        this.mass[i] = 1.0 + Math.random() * 2.0;
+      }
+    }
+
+    this.geometry.setDrawRange(0, N);
+  }
+
+  generateDiscGalaxy(offset, cx, cy, cz, vx, vy, vz, count, radius) {
+    this.mass[offset] = 3000;
+    this.posX[offset] = cx;
+    this.posY[offset] = cy;
+    this.posZ[offset] = cz;
+    this.velX[offset] = vx;
+    this.velY[offset] = vy;
+    this.velZ[offset] = vz;
+
+    for (let i = 1; i < count; i++) {
+      const idx = offset + i;
+      const r = Math.sqrt(Math.random()) * radius + 30;
+      const angle = Math.random() * Math.PI * 2;
+
+      this.posX[idx] = cx + r * Math.cos(angle);
+      this.posY[idx] = cy + (Math.random() - 0.5) * 40;
+      this.posZ[idx] = cz + r * Math.sin(angle);
+
+      const v = Math.sqrt((this.G * 3000) / r);
+      this.velX[idx] = vx - v * Math.sin(angle);
+      this.velY[idx] = vy + (Math.random() - 0.5) * 0.2;
+      this.velZ[idx] = vz + v * Math.cos(angle);
+      this.mass[idx] = 1.0;
+    }
+  }
+
+  initInteraction() {
+    this.raycaster = new THREE.Raycaster();
+    this.mouse = new THREE.Vector2();
+    this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    this.attractorActive = false;
+    this.attractorPos = new THREE.Vector3();
+
+    const markerGeo = new THREE.SphereGeometry(20, 16, 16);
+    const markerMat = new THREE.MeshBasicMaterial({ color: 0xff0055, wireframe: true });
+    this.attractorMesh = new THREE.Mesh(markerGeo, markerMat);
+    this.attractorMesh.visible = false;
+    this.scene.add(this.attractorMesh);
+
+    window.addEventListener('mousemove', (e) => {
+      this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      if (e.buttons === 1 && e.shiftKey) {
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        this.raycaster.ray.intersectPlane(this.plane, this.attractorPos);
+        this.attractorMesh.position.copy(this.attractorPos);
+        this.attractorActive = true;
+        this.attractorMesh.visible = true;
+      } else {
+        this.attractorActive = false;
+        this.attractorMesh.visible = false;
+      }
+    });
+  }
+
+  initUI() {
+    const countSlider = document.getElementById('countSlider');
+    const countValue = document.getElementById('countValue');
+    countSlider.addEventListener('input', (e) => {
+      this.particleCount = parseInt(e.target.value);
+      countValue.innerText = this.particleCount;
+      this.loadPreset(this.activePreset);
+    });
+
+    const thetaSlider = document.getElementById('thetaSlider');
+    const thetaValue = document.getElementById('thetaValue');
+    thetaSlider.addEventListener('input', (e) => {
+      this.theta = parseFloat(e.target.value);
+      thetaValue.innerText = this.theta.toFixed(2);
+    });
+
+    const gSlider = document.getElementById('gSlider');
+    const gValue = document.getElementById('gValue');
+    gSlider.addEventListener('input', (e) => {
+      this.G = parseFloat(e.target.value);
+      gValue.innerText = this.G.toFixed(1);
+    });
+
+    document.getElementById('octreeToggle').addEventListener('change', (e) => {
+      this.showOctree = e.target.checked;
+      this.lineSegments.visible = this.showOctree;
+    });
+
+    document.getElementById('btnGalaxy').addEventListener('click', () => this.loadPreset('galaxy'));
+    document.getElementById('btnAccretion').addEventListener('click', () => this.loadPreset('accretion'));
+    document.getElementById('btnCollapse').addEventListener('click', () => this.loadPreset('collapse'));
+
+    this.fpsElem = document.getElementById('fpsDisplay');
+    this.physicsElem = document.getElementById('physicsDisplay');
+    this.nodesElem = document.getElementById('nodesDisplay');
+
+    this.lastTime = performance.now();
+    this.frameCount = 0;
+  }
+
+  updatePhysics() {
+    const t0 = performance.now();
+    const N = this.particleCount;
+
+    for (let i = 0; i < N; i++) {
+      this.accX[i] = 0;
+      this.accY[i] = 0;
+      this.accZ[i] = 0;
+    }
+
+    this.octree.clear();
+    const root = this.octree.buildTree(this.posX, this.posY, this.posZ, this.mass, N);
+    this.nodesElem.innerText = this.octree.nodesUsed;
+
+    for (let i = 0; i < N; i++) {
+      this.octree.calculateForce(root, i, this.posX, this.posY, this.posZ, this.accX, this.accY, this.accZ, this.theta, this.G, this.softening);
+
+      if (this.attractorActive) {
+        const dx = this.attractorPos.x - this.posX[i];
+        const dy = this.attractorPos.y - this.posY[i];
+        const dz = this.attractorPos.z - this.posZ[i];
+        const distSq = dx * dx + dy * dy + dz * dz + 500;
+        const dist = Math.sqrt(distSq);
+        const force = (this.G * 10000) / (distSq * dist);
+        this.accX[i] += dx * force;
+        this.accY[i] += dy * force;
+        this.accZ[i] += dz * force;
+      }
+    }
+
+    for (let i = 0; i < N; i++) {
+      this.velX[i] += this.accX[i] * this.dt;
+      this.velY[i] += this.accY[i] * this.dt;
+      this.velZ[i] += this.accZ[i] * this.dt;
+
+      this.posX[i] += this.velX[i] * this.dt;
+      this.posY[i] += this.velY[i] * this.dt;
+      this.posZ[i] += this.velZ[i] * this.dt;
+
+      const vx = this.velX[i], vy = this.velY[i], vz = this.velZ[i];
+      this.vMag[i] = Math.sqrt(vx * vx + vy * vy + vz * vz);
+    }
+
+    if (this.showOctree) {
+      const lineIndex = this.octree.renderWireframes(root, this.linePositions, 0);
+      this.lineGeometry.setDrawRange(0, lineIndex / 3);
+      this.lineGeometry.attributes.position.needsUpdate = true;
+    }
+
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.vMag.needsUpdate = true;
+
+    const t1 = performance.now();
+    this.physicsElem.innerText = (t1 - t0).toFixed(1);
+  }
+
+  animate() {
+    requestAnimationFrame(() => this.animate());
+
+    this.updatePhysics();
+    this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+
+    this.frameCount++;
+    const now = performance.now();
+    if (now - this.lastTime >= 1000) {
+      this.fpsElem.innerText = Math.round((this.frameCount * 1000) / (now - this.lastTime));
+      this.frameCount = 0;
+      this.lastTime = now;
+    }
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  new Simulation();
+});
+</script>
+</body>
+</html>
